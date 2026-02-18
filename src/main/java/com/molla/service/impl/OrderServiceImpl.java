@@ -49,18 +49,22 @@ public class OrderServiceImpl implements OrderService {
 
         try {
             cashier = userService.getCurrentUser();
-            branch = cashier.getBranch();
+            if (cashier != null) {
+                branch = cashier.getBranch();
+            }
         } catch (Exception e) {
-            // No authenticated user - check if IDs are provided in DTO
-            if (orderDto.getBranchId() != null) {
-                branch = branchRepository.findById(orderDto.getBranchId())
-                        .orElseThrow(() -> new Exception("Branch not found with ID: " + orderDto.getBranchId()));
-            }
+            // User might not be authenticated or found
+        }
 
-            if (orderDto.getCashierId() != null) {
-                cashier = userRepository.findById(orderDto.getCashierId())
-                        .orElseThrow(() -> new Exception("Cashier not found with ID: " + orderDto.getCashierId()));
-            }
+        // Fallback to DTO if not found from current user
+        if (branch == null && orderDto.getBranchId() != null) {
+            branch = branchRepository.findById(orderDto.getBranchId())
+                    .orElseThrow(() -> new Exception("Branch not found with ID: " + orderDto.getBranchId()));
+        }
+
+        if (cashier == null && orderDto.getCashierId() != null) {
+            cashier = userRepository.findById(orderDto.getCashierId())
+                    .orElseThrow(() -> new Exception("Cashier not found with ID: " + orderDto.getCashierId()));
         }
 
         if (branch == null) {

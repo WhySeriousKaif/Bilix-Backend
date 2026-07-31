@@ -164,11 +164,11 @@ public class AuthController {
             try {
                 mailService.sendSimpleMail(
                         newUser.getEmail(),
-                        "Welcome to Molla POS",
+                        "Welcome to Bilix POS",
                         "Hi " + newUser.getFullName() + ",\n\n" +
                                 "Your account has been created successfully.\n\n" +
                                 "Role: " + newUser.getRole() + "\n\n" +
-                                "Regards,\nMolla POS System");
+                                "Regards,\nBilix POS System");
             } catch (Exception e) {
                 System.out.println("Failed to send welcome email: " + e.getMessage());
             }

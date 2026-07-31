@@ -39,9 +39,9 @@ public class OpenApiConfig {
 
         // 📝 API Information - Metadata shown in Swagger UI
         Info info = new Info()
-                .title("Molla POS System API Documentation")
+                .title("Bilix POS System API Documentation")
                 .version("1.0.0")
-                .description("Complete API documentation for Molla POS System. " +
+                .description("Complete API documentation for Bilix POS System. " +
                         "Includes Authentication, Products, Orders, Inventory, Analytics, and more. " +
                         "\n\n**How to use:**\n" +
                         "1. First, call `/auth/login` or `/auth/register` to get a JWT token\n" +
@@ -49,7 +49,7 @@ public class OpenApiConfig {
                         "3. Paste your JWT token (format: `Bearer <your-token>` or just `<your-token>`)\n" +
                         "4. Now you can test all protected endpoints!")
                 .contact(new Contact()
-                        .name("Molla POS System")
+                        .name("Bilix POS System")
                         .email("support@molla.com"))
                 .license(new License()
                         .name("MIT License")

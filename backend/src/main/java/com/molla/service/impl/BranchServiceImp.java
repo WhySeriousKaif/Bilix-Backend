@@ -80,14 +80,16 @@ public class BranchServiceImp implements BranchService {
     public BranchDto updateBranch(Long id, BranchDto branchDto, User user) {
         Branch existingBranch = branchRepository.findById(id)
         .orElseThrow(() -> new NotFoundException("Branch not found with id: " + id));
-        accessControlService.requireManagerAccessToBranch(userService.getCurrentUser(), existingBranch);
-        existingBranch.setName(branchDto.getName());
-        existingBranch.setPhone(branchDto.getPhone());
-        existingBranch.setAddress(branchDto.getAddress());
-        existingBranch.setEmail(branchDto.getEmail());
-        existingBranch.setWorkingDays(branchDto.getWorkingDays());
-        existingBranch.setOpenTime(branchDto.getOpenTime());
-        existingBranch.setCloseTime(branchDto.getCloseTime());
+        accessControlService.requireBranchInfoEditAccess(userService.getCurrentUser(), existingBranch);
+        // Partial update: only overwrite fields actually supplied, so callers that
+        // only send a subset (e.g. name/address/phone/email) don't wipe the rest.
+        if (branchDto.getName() != null) existingBranch.setName(branchDto.getName());
+        if (branchDto.getPhone() != null) existingBranch.setPhone(branchDto.getPhone());
+        if (branchDto.getAddress() != null) existingBranch.setAddress(branchDto.getAddress());
+        if (branchDto.getEmail() != null) existingBranch.setEmail(branchDto.getEmail());
+        if (branchDto.getWorkingDays() != null) existingBranch.setWorkingDays(branchDto.getWorkingDays());
+        if (branchDto.getOpenTime() != null) existingBranch.setOpenTime(branchDto.getOpenTime());
+        if (branchDto.getCloseTime() != null) existingBranch.setCloseTime(branchDto.getCloseTime());
         Branch savedBranch = branchRepository.save(existingBranch);
         return BranchMapper.toDto(savedBranch);
 

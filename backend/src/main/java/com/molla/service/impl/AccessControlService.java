@@ -100,6 +100,31 @@ public class AccessControlService {
         throw new BadRequestException("Only a Store Admin, Store Manager, Branch Manager, or Super Admin can manage employees");
     }
 
+    /**
+     * For editing a branch's own display/contact info (name/address/phone/email) — looser than
+     * requireManagerAccessToBranch: any staff member assigned to the branch (including a plain
+     * cashier) may update their own branch's info, but not another branch's. Deleting a branch
+     * or managing employees still requires requireManagerAccessToBranch.
+     */
+    public void requireBranchInfoEditAccess(User user, Branch branch) {
+        if (user.getRole() == UserRole.ROLE_ADMIN) {
+            return;
+        }
+        if (user.getRole() == UserRole.ROLE_STORE_ADMIN || user.getRole() == UserRole.ROLE_STORE_MANAGER) {
+            Long userStoreId = user.getStore() != null ? user.getStore().getId() : null;
+            Long branchStoreId = branch != null && branch.getStore() != null ? branch.getStore().getId() : null;
+            if (userStoreId != null && userStoreId.equals(branchStoreId)) {
+                return;
+            }
+            throw new BadRequestException("You do not have access to this branch");
+        }
+        Long userBranchId = user.getBranch() != null ? user.getBranch().getId() : null;
+        if (userBranchId != null && branch != null && userBranchId.equals(branch.getId())) {
+            return;
+        }
+        throw new BadRequestException("You do not have access to this branch");
+    }
+
     /** Store-level equivalent of requireManagerAccessToBranch, for actions not scoped to one branch. */
     public void requireManagerAccessToStore(User user, Long storeId) {
         if (user.getRole() == UserRole.ROLE_ADMIN) {

@@ -2,6 +2,8 @@ package com.molla.service.impl;
 
 import com.molla.domain.OrderStatus;
 import com.molla.domain.PaymentType;
+import com.molla.exceptions.BadRequestException;
+import com.molla.exceptions.NotFoundException;
 import com.molla.mapper.OrderMapper;
 import com.molla.model.Branch;
 import com.molla.model.Customer;
@@ -43,6 +45,7 @@ public class OrderServiceImpl implements OrderService {
     private final AccessControlService accessControlService;
 
     @Override
+    @CacheEvict(cacheNames = { "productsByStore", "productsAll" }, allEntries = true)
     public OrderDto createOrder(OrderDto orderDto) throws Exception {
         // The order is always attributed to whoever is actually authenticated —
         // never trust a branchId/cashierId supplied by the client for this.
@@ -82,11 +85,11 @@ public class OrderServiceImpl implements OrderService {
             } else if (itemDto.getProduct() != null && itemDto.getProduct().getId() != null) {
                 productId = itemDto.getProduct().getId();
             } else {
-                throw new RuntimeException("Product ID is required for order item");
+                throw new BadRequestException("Product ID is required for order item");
             }
 
             Product product = productRepository.findById(productId)
-                    .orElseThrow(() -> new RuntimeException("Product not found with id: " + productId));
+                    .orElseThrow(() -> new NotFoundException("Product not found with id: " + productId));
 
             Double itemPrice = itemDto.getPrice();
             if (itemPrice == null) {
@@ -97,11 +100,23 @@ public class OrderServiceImpl implements OrderService {
                 } else if (product.getMrp() != null) {
                     itemPrice = product.getMrp();
                 } else {
-                    throw new RuntimeException("Product price is missing for product: " + product.getName());
+                    throw new BadRequestException("Product price is missing for product: " + product.getName());
                 }
             }
             Integer quantity = itemDto.getQuantity() != null ? itemDto.getQuantity() : 1;
             Double totalPrice = itemPrice * quantity;
+
+            // Deduct sold quantity from stock so the catalog (and every dashboard reading it)
+            // reflects what's actually left on the shelf.
+            if (product.getQuantity() != null) {
+                if (product.getQuantity() < quantity) {
+                    throw new BadRequestException(
+                            "Not enough stock for " + product.getName() + " (available: " + product.getQuantity()
+                                    + ", requested: " + quantity + ")");
+                }
+                product.setQuantity(product.getQuantity() - quantity);
+                productRepository.save(product);
+            }
 
             return OrderItem.builder()
                     .product(product)

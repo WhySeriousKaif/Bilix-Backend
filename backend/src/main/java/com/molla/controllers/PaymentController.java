@@ -36,10 +36,13 @@ public class PaymentController {
         } catch (RazorpayException e) {
             // Razorpay auth failures (bad key/secret) surface here as a RazorpayException too;
             // distinguish them so a misconfigured key doesn't look like a generic server crash.
+            // Deliberately NOT 401: the frontend treats any 401 from ANY endpoint as "your own
+            // login session expired" and force-logs the user out — this is our backend failing
+            // to authenticate with Razorpay's API, which has nothing to do with the user's login.
             String message = e.getMessage() != null ? e.getMessage() : "";
             if (message.toLowerCase().contains("authentication") || message.toLowerCase().contains("key_id")) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Razorpay authentication failed: " + message));
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                        .body(Map.of("error", "Razorpay rejected our API credentials: " + message));
             }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Error creating order: " + message));

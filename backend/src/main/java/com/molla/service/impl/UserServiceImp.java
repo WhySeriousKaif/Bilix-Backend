@@ -6,6 +6,7 @@ import com.molla.repository.UserRepository;
 import com.molla.service.UserService;
 import com.molla.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -72,6 +73,7 @@ public class UserServiceImp implements UserService {
     }
 
     @Override
+    @CacheEvict(cacheNames = { "users", "usersAll" }, allEntries = true)
     public User updateUser(User user) {
         return userRepository.save(user);
     }

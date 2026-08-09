@@ -29,6 +29,7 @@ public class BranchServiceImp implements BranchService {
     private final AccessControlService accessControlService;
 
     @Override
+    @CacheEvict(cacheNames = { "branches", "branchesByStore" }, allEntries = true)
     public BranchDto createBranch(BranchDto branchDto, User user) {
         User currentUser = userService.getCurrentUser();
         Store store = storeRepository.findByStoreAdminId(currentUser.getId());

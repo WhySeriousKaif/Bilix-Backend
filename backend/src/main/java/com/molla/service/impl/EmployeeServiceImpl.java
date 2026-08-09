@@ -14,6 +14,7 @@ import com.molla.repository.UserRepository;
 import com.molla.service.EmployeeService;
 import com.molla.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +32,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final AccessControlService accessControlService;
 
     @Override
+    @CacheEvict(cacheNames = { "users", "usersAll" }, allEntries = true)
     public UserDto createStoreEmployee(UserDto employee, Long storeId) throws UserException {
         accessControlService.requireManagerAccessToStore(userService.getCurrentUser(), storeId);
         Store store = storeRepository.findById(storeId).orElseThrow(() -> new RuntimeException("Store not found"));
@@ -58,6 +60,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
+    @CacheEvict(cacheNames = { "users", "usersAll" }, allEntries = true)
     public UserDto createBranchEmployee(UserDto employeeDetails, Long branchId) throws UserException {
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new RuntimeException("Branch not found"));
@@ -83,6 +86,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
+    @CacheEvict(cacheNames = { "users", "usersAll" }, allEntries = true)
     public UserDto updateEmployee(UserDto employeeDetails, Long employeeId) throws UserException {
         User existingUser = userRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found with this id"));
@@ -128,11 +132,15 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
+    @CacheEvict(cacheNames = { "users", "usersAll" }, allEntries = true)
     public void deleteEmployee(Long employeeId) throws UserException {
         User existingUser = userRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
         User currentUser = userService.getCurrentUser();
+        if (currentUser.getId().equals(existingUser.getId())) {
+            throw new UserException("You cannot delete your own account");
+        }
         if (existingUser.getBranch() != null) {
             accessControlService.requireManagerAccessToBranch(currentUser, existingUser.getBranch());
         } else if (existingUser.getStore() != null) {

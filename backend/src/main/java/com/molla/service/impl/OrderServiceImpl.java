@@ -45,7 +45,7 @@ public class OrderServiceImpl implements OrderService {
     private final AccessControlService accessControlService;
 
     @Override
-    @CacheEvict(cacheNames = { "productsByStore", "productsAll" }, allEntries = true)
+    @CacheEvict(cacheNames = { "productsByStore", "productsAll", "orders", "recentOrdersByBranch" }, allEntries = true)
     public OrderDto createOrder(OrderDto orderDto) throws Exception {
         // The order is always attributed to whoever is actually authenticated —
         // never trust a branchId/cashierId supplied by the client for this.

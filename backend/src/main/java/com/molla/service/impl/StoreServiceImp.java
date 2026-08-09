@@ -32,6 +32,7 @@ public class StoreServiceImp implements StoreService {
     private final EmployeeService employeeService;
 
     @Override
+    @CacheEvict(cacheNames = { "stores", "storesAll", "storesByAdmin" }, allEntries = true)
     public StoreDto createStore(StoreDto storeDto, User user) {
         // 🔐 Authorization: Only a Store Admin may create/register their own store
         if (!user.getRole().equals(UserRole.ROLE_STORE_ADMIN)) {

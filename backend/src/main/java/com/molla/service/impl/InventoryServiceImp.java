@@ -28,6 +28,7 @@ public class InventoryServiceImp implements InventoryService {
     private final AccessControlService accessControlService;
 
     @Override
+    @CacheEvict(cacheNames = { "inventory", "inventoriesByBranch" }, allEntries = true)
     public InventoryDto createInventory(InventoryDto inventoryDto) {
         // Validate required fields
         if (inventoryDto.getBranchId() == null) {

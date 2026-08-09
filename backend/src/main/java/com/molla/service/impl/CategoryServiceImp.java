@@ -29,7 +29,11 @@ public class CategoryServiceImp implements CategoryService {
     private final AccessControlService accessControlService;
 
     @Override
+    @CacheEvict(cacheNames = "categoriesByStore", allEntries = true)
     public CategoryDto createCategory(CategoryDto categoryDto, User user) {
+        if (categoryDto.getStoreId() == null) {
+            throw new BadRequestException("You need to create a store before adding categories.");
+        }
         Store store = storeRepository.findById(categoryDto.getStoreId())
                 .orElseThrow(() -> new NotFoundException("Store not found with id: " + categoryDto.getStoreId()));
         checkAuthority(user, store);

@@ -41,7 +41,13 @@ public class Store {
     @PrePersist
     protected void onCreate(){
         createdAt=LocalDateTime.now();
-        storeStatus= StoreStatus.PENDING;
+        // Only default to PENDING if the caller didn't already set a status (e.g. seed
+        // data explicitly creating an ACTIVE store) — this used to unconditionally
+        // overwrite any status on insert, so a store created as ACTIVE always ended up
+        // PENDING in the database regardless of what the code asked for.
+        if (storeStatus == null) {
+            storeStatus = StoreStatus.PENDING;
+        }
     }
 
     @PreUpdate

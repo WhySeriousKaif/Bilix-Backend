@@ -55,12 +55,12 @@ public class AuthController {
     private final BranchRepository branchRepository;
     private final StoreRepository storeRepository;
 
-    // Roles a user may assign to themselves via public self-registration.
-    // Anything else (admin, store admin, store manager, etc.) must be granted by an existing admin.
+    // Public self-registration only ever creates a Store Admin (the business owner
+    // signing up for their own account). Every other role — branch manager, cashier,
+    // super admin — is created top-down from inside the app by the level above it:
+    // Store Admin creates Branch Managers, Branch Manager creates Cashiers.
     private static final java.util.Set<UserRole> SELF_REGISTERABLE_ROLES = java.util.Set.of(
-            UserRole.ROLE_CASHIER,
-            UserRole.ROLE_BRANCH_CASHIER,
-            UserRole.ROLE_BRANCH_MANAGER);
+            UserRole.ROLE_STORE_ADMIN);
 
     // 📧 Optional email service (only active when spring.mail.host is configured)
     @Autowired(required = false)
@@ -98,6 +98,7 @@ public class AuthController {
      */
     @Operation(summary = "Register a new user", description = "Register a new user. Returns the created user with JWT token.")
     @PostMapping("/signup")
+    @org.springframework.cache.annotation.CacheEvict(cacheNames = { "users", "usersAll" }, allEntries = true)
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         // 🔍 Step 1: Check if user already exists
         User existingUser = userRepository.findByEmail(request.getEmail());

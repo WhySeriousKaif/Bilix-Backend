@@ -12,6 +12,7 @@ import com.molla.repository.CategoryRepository;
 import com.molla.repository.ProductRepository;
 import com.molla.repository.StoreRepository;
 import com.molla.service.ProductService;
+import com.molla.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -26,10 +27,18 @@ public class ProductServiceImp implements ProductService {
     private final ProductRepository productRepository;
     private final StoreRepository storeRepository;
     private final CategoryRepository categoryRepository;
+    private final UserService userService;
+    private final AccessControlService accessControlService;
 
     @Override
     @CacheEvict(cacheNames = { "productsByStore", "productsAll" }, allEntries = true)
     public ProductDto createProduct(ProductDto productDto, User user) {
+        if (productDto.getStoreId() == null) {
+            throw new BadRequestException("You need to create a store before adding products.");
+        }
+        if (productDto.getCategoryId() == null) {
+            throw new BadRequestException("You need to create a category before adding products.");
+        }
         Store store = storeRepository.findById(
                 productDto.getStoreId())
                 .orElseThrow(() -> new NotFoundException("Store not found with id: " + productDto.getStoreId()));
@@ -99,6 +108,10 @@ public class ProductServiceImp implements ProductService {
     @Override
     @Cacheable(cacheNames = "productsByStore", key = "#storeId")
     public List<ProductDto> getProductsById(Long storeId) {
+        // Any authenticated user (cashier, branch manager, etc.) can pass any storeId here —
+        // without this check, a cashier from Store A could read Store B's whole catalog just
+        // by changing the id in the request.
+        accessControlService.requireStoreAccess(userService.getCurrentUser(), storeId);
         List<Product> products = productRepository.findByStoreId(storeId);
         return products.stream().map(ProductMapper::toDto).collect(Collectors.toList());
     }

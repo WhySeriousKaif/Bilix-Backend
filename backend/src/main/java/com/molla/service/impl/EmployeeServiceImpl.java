@@ -36,10 +36,12 @@ public class EmployeeServiceImpl implements EmployeeService {
     public UserDto createStoreEmployee(UserDto employee, Long storeId) throws UserException {
         accessControlService.requireManagerAccessToStore(userService.getCurrentUser(), storeId);
         Store store = storeRepository.findById(storeId).orElseThrow(() -> new RuntimeException("Store not found"));
-        Branch branch = null; // branch is null if the employee is not a branch manager
-        if (employee.getRole() == UserRole.ROLE_BRANCH_MANAGER) {
+        Branch branch = null; // branch stays null for store-level roles (Store Manager, Store Employee)
+        boolean isBranchScopedRole = employee.getRole() == UserRole.ROLE_BRANCH_MANAGER
+                || employee.getRole() == UserRole.ROLE_BRANCH_CASHIER;
+        if (isBranchScopedRole) {
             if (employee.getBranchId() == null) {
-                throw new UserException("Branch ID is required to create a branch manager");
+                throw new UserException("Branch ID is required for this role");
             }
             branch = branchRepository.findById(employee.getBranchId())
                     .orElseThrow(() -> new RuntimeException("Branch not found"));

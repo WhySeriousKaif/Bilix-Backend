@@ -53,14 +53,14 @@ public class OrderServiceImpl implements OrderService {
         Branch branch = cashier.getBranch();
 
         if (branch == null) {
-            throw new Exception("Your account is not assigned to a branch. Contact your manager.");
+            throw new BadRequestException("Your account is not assigned to a branch. Contact your manager.");
         }
 
         // Get customer if customerId is provided
         Customer customer = null;
         if (orderDto.getCustomerId() != null) {
             customer = customerRepository.findById(orderDto.getCustomerId())
-                    .orElseThrow(() -> new Exception("Customer not found"));
+                    .orElseThrow(() -> new NotFoundException("Customer not found"));
         }
 
         // Create order
@@ -74,7 +74,7 @@ public class OrderServiceImpl implements OrderService {
 
         // Create order items
         if (orderDto.getOrderItems() == null || orderDto.getOrderItems().isEmpty()) {
-            throw new Exception("Order must have at least one item");
+            throw new BadRequestException("Order must have at least one item");
         }
 
         List<OrderItem> orderItems = orderDto.getOrderItems().stream().map((OrderItemDto itemDto) -> {

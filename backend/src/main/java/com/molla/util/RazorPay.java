@@ -3,6 +3,7 @@ package com.molla.util;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
+import com.razorpay.Utils;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -81,6 +82,25 @@ public class RazorPay {
             System.out.println("ERROR: Unexpected exception in createOrder: " + e.getMessage());
             e.printStackTrace();
             throw new RazorpayException("Internal Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Recomputes the HMAC-SHA256 signature Razorpay sends after a successful checkout
+     * and compares it against what the client reported. Without this, a client could
+     * fabricate a fake payment_id/signature pair and get an order marked as paid
+     * without ever actually paying — this is what actually proves the payment happened.
+     */
+    public boolean verifyPaymentSignature(String razorpayOrderId, String razorpayPaymentId, String razorpaySignature) {
+        try {
+            JSONObject options = new JSONObject();
+            options.put("razorpay_order_id", razorpayOrderId);
+            options.put("razorpay_payment_id", razorpayPaymentId);
+            options.put("razorpay_signature", razorpaySignature);
+            return Utils.verifyPaymentSignature(options, apiSecret);
+        } catch (Exception e) {
+            System.out.println("ERROR: Signature verification failed: " + e.getMessage());
+            return false;
         }
     }
 

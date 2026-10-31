@@ -47,7 +47,11 @@ public class Order {
     
     @PrePersist
     protected void onCreate(){
-        createdAt = LocalDateTime.now();
+        // Only stamp the creation time when the caller didn't set one explicitly —
+        // back-dated imports/seeds keep the date they were given.
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
         if (status == null) {
             status = OrderStatus.PENDING;
         }

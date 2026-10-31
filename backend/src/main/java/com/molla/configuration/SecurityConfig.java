@@ -107,6 +107,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/stores").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/stores/*/moderate").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/stores/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/users/paged", "/api/orders/system/paged", "/api/orders/system/summary").hasRole("ADMIN")
                         // 🔒 PUT /api/stores/*: authenticated (service layer enforces: store admin = own store, super admin = any store)
                         // 🔒 Other protected endpoints
                         .requestMatchers("/api/super-admin/**").hasRole("ADMIN")

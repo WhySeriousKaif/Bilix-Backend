@@ -19,6 +19,7 @@ public class BranchMapper {
         .createdAt(branch.getCreatedAt())
         .updatedAt(branch.getUpdatedAt())
         .storeId(branch.getStore()!=null ? branch.getStore().getId() : null)
+        .manager(branch.getManager() != null ? UserMapper.toDto(branch.getManager()) : null)
         .build();
     }
     public static Branch toEntity(BranchDto branchDto,Store store) {

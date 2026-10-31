@@ -11,6 +11,8 @@ import com.molla.payload.dto.UserDto;
 import com.molla.exceptions.UserException;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import com.molla.domain.UserRole;
 
 @RestController
 @RequestMapping("/api/users")
@@ -48,5 +50,18 @@ public class UserController {
     public ResponseEntity<List<UserDto>> getAllUsers() throws UserException {
         List<User> users = userService.getAllUsers();
         return ResponseEntity.ok(users.stream().map(UserMapper::toDto).collect(Collectors.toList()));
+    }
+
+    @GetMapping("/paged")
+    public ResponseEntity<Page<UserDto>> getUsersPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) UserRole role) {
+        return ResponseEntity.ok(userService
+                .getUsersPaged(page, size, sortBy, direction, search, role)
+                .map(UserMapper::toDto));
     }
 }

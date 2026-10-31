@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -31,7 +33,7 @@ public class ProductServiceImp implements ProductService {
     private final AccessControlService accessControlService;
 
     @Override
-    @CacheEvict(cacheNames = { "productsByStore", "productsAll" }, allEntries = true)
+    @CacheEvict(cacheNames = { "productsByStore", "productsAll", "categoriesByStore" }, allEntries = true)
     public ProductDto createProduct(ProductDto productDto, User user) {
         if (productDto.getStoreId() == null) {
             throw new BadRequestException("You need to create a store before adding products.");
@@ -44,6 +46,10 @@ public class ProductServiceImp implements ProductService {
                 .orElseThrow(() -> new NotFoundException("Store not found with id: " + productDto.getStoreId()));
         Category category = categoryRepository.findById(productDto.getCategoryId())
                 .orElseThrow(() -> new NotFoundException("Category not found with id: " + productDto.getCategoryId()));
+        if (category.getStore() == null || !category.getStore().getId().equals(store.getId())) {
+            throw new BadRequestException("Selected category does not belong to this store");
+        }
+        accessControlService.requireStoreAccess(userService.getCurrentUser(), store.getId());
 
         // Check if SKU already exists
         if (productDto.getSku() != null && !productDto.getSku().isEmpty()) {
@@ -67,7 +73,7 @@ public class ProductServiceImp implements ProductService {
     }
 
     @Override
-    @CacheEvict(cacheNames = { "productsByStore", "productsAll" }, allEntries = true)
+    @CacheEvict(cacheNames = { "productsByStore", "productsAll", "categoriesByStore" }, allEntries = true)
     public ProductDto updateProduct(Long id, ProductDto productDto, User user) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Product not found with id: " + id));
@@ -92,12 +98,21 @@ public class ProductServiceImp implements ProductService {
                     .orElseThrow(() -> new NotFoundException("Store not found with id: " + productDto.getStoreId()));
             product.setStore(store);
         }
+        if (productDto.getCategoryId() != null) {
+            Category category = categoryRepository.findById(productDto.getCategoryId())
+                    .orElseThrow(() -> new NotFoundException("Category not found with id: " + productDto.getCategoryId()));
+            if (product.getStore() == null || category.getStore() == null
+                    || !category.getStore().getId().equals(product.getStore().getId())) {
+                throw new BadRequestException("Selected category does not belong to this store");
+            }
+            product.setCategory(category);
+        }
         Product savedProduct = productRepository.save(product);
         return ProductMapper.toDto(savedProduct);
     }
 
     @Override
-    @CacheEvict(cacheNames = { "productsByStore", "productsAll" }, allEntries = true)
+    @CacheEvict(cacheNames = { "productsByStore", "productsAll", "categoriesByStore" }, allEntries = true)
     public void deleteProduct(Long id, User user) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Product not found with id: " + id));
@@ -114,6 +129,19 @@ public class ProductServiceImp implements ProductService {
         accessControlService.requireStoreAccess(userService.getCurrentUser(), storeId);
         List<Product> products = productRepository.findByStoreId(storeId);
         return products.stream().map(ProductMapper::toDto).collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<ProductDto> getProductsPaged(Long storeId, Pageable pageable) {
+        accessControlService.requireStoreAccess(userService.getCurrentUser(), storeId);
+        return productRepository.findByStoreId(storeId, pageable).map(ProductMapper::toDto);
+    }
+
+    @Override
+    public Page<ProductDto> getProductsPaged(Long storeId, String search, Pageable pageable) {
+        String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+        return productRepository.findByStoreIdFiltered(storeId, normalizedSearch, pageable)
+                .map(ProductMapper::toDto);
     }
 
     @Override

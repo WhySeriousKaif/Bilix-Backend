@@ -2,6 +2,8 @@ package com.molla.service;
 
 import com.molla.model.Customer;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 
 public interface CustomerService {
@@ -12,6 +14,7 @@ public interface CustomerService {
     Customer getCustomerById(Long id) throws Exception; 
     List<Customer> getAllCustomers() throws Exception;
     List<Customer>  searchCustomers(String keyword) throws Exception;
+    Page<Customer> getCustomers(String keyword, Pageable pageable);
 
     
 }

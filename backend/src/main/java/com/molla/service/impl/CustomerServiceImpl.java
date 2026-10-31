@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 
 import com.molla.repository.CustomerRepository;  
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -53,5 +55,11 @@ public class CustomerServiceImpl implements CustomerService{
     @Override
     public List<Customer> searchCustomers(String keyword) throws Exception {
         return customerRepository.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(keyword, keyword); 
+    }
+
+    @Override
+    public Page<Customer> getCustomers(String keyword, Pageable pageable) {
+        if (keyword == null || keyword.isBlank()) return customerRepository.findAll(pageable);
+        return customerRepository.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(keyword.trim(), keyword.trim(), pageable);
     }
 }

@@ -48,6 +48,11 @@ public class RefundController {
         return ResponseEntity.ok(refunds);
     }
 
+    @GetMapping("/order/{orderId}")
+    public ResponseEntity<List<RefundDto>> getRefundByOrder(@PathVariable("orderId") Long orderId) throws Exception {
+        return ResponseEntity.ok(refundService.getRefundByOrder(orderId));
+    }
+
     @GetMapping("/cashier/{cashierId}/range")
     public ResponseEntity<List<RefundDto>> getRefundByCashierAndDateRange(
             @PathVariable("cashierId") Long cashierId,
@@ -70,4 +75,3 @@ public class RefundController {
         return ResponseEntity.ok(apiResponse);
     }
 }
-

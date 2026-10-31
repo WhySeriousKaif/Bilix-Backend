@@ -13,10 +13,12 @@ import com.molla.model.Product;
 import com.molla.model.User;
 import com.molla.payload.dto.OrderDto;
 import com.molla.payload.dto.OrderItemDto;
+import com.molla.payload.dto.SystemSalesSummaryDto;
 import com.molla.repository.BranchRepository;
 import com.molla.repository.CustomerRepository;
 import com.molla.repository.OrderRepository;
 import com.molla.repository.ProductRepository;
+import com.molla.repository.RefundRepository;
 import com.molla.repository.UserRepository;
 import com.molla.service.OrderService;
 import com.molla.service.UserService;
@@ -32,6 +34,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +49,7 @@ public class OrderServiceImpl implements OrderService {
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
     private final AccessControlService accessControlService;
+    private final RefundRepository refundRepository;
 
     @Override
     @CacheEvict(cacheNames = { "productsByStore", "productsAll", "orders", "recentOrdersByBranch" }, allEntries = true)
@@ -259,5 +266,77 @@ public class OrderServiceImpl implements OrderService {
 
         Page<Order> pageResult = orderRepository.findByBranchId(branchId, pageable);
         return pageResult.map(OrderMapper::toDto);
+    }
+
+    @Override
+    public Page<OrderDto> getSystemSalesPaged(int page, int size, String sortBy, String direction,
+            String search, OrderStatus status, Long storeId) {
+        accessControlService.requireAdmin(userService.getCurrentUser());
+        page = Math.max(page, 0);
+        size = size <= 0 || size > 100 ? 10 : size;
+        Set<String> allowedSorts = Set.of("id", "createdAt", "totalAmount", "status", "paymentType");
+        sortBy = allowedSorts.contains(sortBy) ? sortBy : "createdAt";
+        Sort sort = "asc".equalsIgnoreCase(direction)
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+        return orderRepository.findSystemSalesFiltered(
+                normalizedSearch, status, storeId, PageRequest.of(page, size, sort))
+                .map(OrderMapper::toDto);
+    }
+
+    @Override
+    public SystemSalesSummaryDto getSystemSalesSummary() {
+        accessControlService.requireAdmin(userService.getCurrentUser());
+        LocalDate today = LocalDate.now();
+        LocalDateTime todayStart = today.atStartOfDay();
+        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
+        LocalDateTime sevenDaysStart = today.minusDays(6).atStartOfDay();
+
+        double totalSales = orderRepository.sumSystemSales();
+        double refundAmount = refundRepository.sumSystemRefundAmount();
+
+        Map<LocalDate, Double> dailyTotals = new LinkedHashMap<>();
+        for (int day = 6; day >= 0; day--) {
+            dailyTotals.put(today.minusDays(day), 0.0);
+        }
+        orderRepository.findSalesRowsBetween(sevenDaysStart, tomorrowStart).forEach(row -> {
+            LocalDate date = ((LocalDateTime) row[0]).toLocalDate();
+            double amount = row[1] == null ? 0.0 : ((Number) row[1]).doubleValue();
+            dailyTotals.computeIfPresent(date, (key, value) -> value + amount);
+        });
+
+        List<SystemSalesSummaryDto.NamedAmountDto> dailySales = dailyTotals.entrySet().stream()
+                .map(entry -> new SystemSalesSummaryDto.NamedAmountDto(entry.getKey().toString(), entry.getValue()))
+                .toList();
+        List<SystemSalesSummaryDto.NamedAmountDto> paymentMethods = orderRepository.sumSalesByPaymentType().stream()
+                .map(row -> new SystemSalesSummaryDto.NamedAmountDto(
+                        row[0] == null ? "CASH" : row[0].toString(),
+                        ((Number) row[1]).doubleValue()))
+                .toList();
+
+        return SystemSalesSummaryDto.builder()
+                .totalSales(totalSales)
+                .ordersToday(orderRepository.countByCreatedAtBetween(todayStart, tomorrowStart))
+                .totalRefunds(refundRepository.count())
+                .refundAmount(refundAmount)
+                .netSales(totalSales - refundAmount)
+                .dailySales(dailySales)
+                .paymentMethods(paymentMethods)
+                .storeSales(toIdSales(orderRepository.sumSalesByStore()))
+                .branchSales(toIdSales(orderRepository.sumSalesByBranch()))
+                .build();
+    }
+
+    private List<SystemSalesSummaryDto.IdSalesDto> toIdSales(List<Object[]> rows) {
+        List<SystemSalesSummaryDto.IdSalesDto> result = new ArrayList<>();
+        for (Object[] row : rows) {
+            if (row[0] == null) continue;
+            result.add(new SystemSalesSummaryDto.IdSalesDto(
+                    ((Number) row[0]).longValue(),
+                    ((Number) row[1]).doubleValue(),
+                    ((Number) row[2]).longValue()));
+        }
+        return result;
     }
 }

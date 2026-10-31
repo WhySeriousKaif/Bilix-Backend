@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,7 +33,8 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final AccessControlService accessControlService;
 
     @Override
-    @CacheEvict(cacheNames = { "users", "usersAll" }, allEntries = true)
+    @CacheEvict(cacheNames = { "users", "usersAll", "branches", "branchesByStore" }, allEntries = true)
+    @Transactional
     public UserDto createStoreEmployee(UserDto employee, Long storeId) throws UserException {
         accessControlService.requireManagerAccessToStore(userService.getCurrentUser(), storeId);
         Store store = storeRepository.findById(storeId).orElseThrow(() -> new RuntimeException("Store not found"));
@@ -43,8 +45,9 @@ public class EmployeeServiceImpl implements EmployeeService {
             if (employee.getBranchId() == null) {
                 throw new UserException("Branch ID is required for this role");
             }
-            branch = branchRepository.findById(employee.getBranchId())
+            branch = branchRepository.findByIdForUpdate(employee.getBranchId())
                     .orElseThrow(() -> new RuntimeException("Branch not found"));
+            ensureBranchManagerAvailable(employee.getRole(), branch, null);
         }
 
         User user = UserMapper.toEntity(employee, passwordEncoder);
@@ -62,9 +65,10 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
-    @CacheEvict(cacheNames = { "users", "usersAll" }, allEntries = true)
+    @CacheEvict(cacheNames = { "users", "usersAll", "branches", "branchesByStore" }, allEntries = true)
+    @Transactional
     public UserDto createBranchEmployee(UserDto employeeDetails, Long branchId) throws UserException {
-        Branch branch = branchRepository.findById(branchId)
+        Branch branch = branchRepository.findByIdForUpdate(branchId)
                 .orElseThrow(() -> new RuntimeException("Branch not found"));
 
         User currentUser = userService.getCurrentUser();
@@ -72,6 +76,7 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         if (employeeDetails.getRole() == UserRole.ROLE_BRANCH_CASHIER
                 || employeeDetails.getRole() == UserRole.ROLE_BRANCH_MANAGER) {
+            ensureBranchManagerAvailable(employeeDetails.getRole(), branch, null);
             User user = UserMapper.toEntity(employeeDetails, passwordEncoder);
             user.setBranch(branch);
             // Set store from branch
@@ -88,13 +93,16 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
-    @CacheEvict(cacheNames = { "users", "usersAll" }, allEntries = true)
+    @CacheEvict(cacheNames = { "users", "usersAll", "branches", "branchesByStore" }, allEntries = true)
+    @Transactional
     public UserDto updateEmployee(UserDto employeeDetails, Long employeeId) throws UserException {
         User existingUser = userRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found with this id"));
 
         // 🔐 Authorization: must have manager-level authority over this employee's current branch/store
         User currentUser = userService.getCurrentUser();
+        Branch previousBranch = existingUser.getBranch();
+        boolean wasBranchManager = existingUser.getRole() == UserRole.ROLE_BRANCH_MANAGER;
         if (existingUser.getBranch() != null) {
             accessControlService.requireManagerAccessToBranch(currentUser, existingUser.getBranch());
         } else if (existingUser.getStore() != null) {
@@ -105,9 +113,10 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         // If moving the employee to a different branch, the caller needs authority there too
         if (employeeDetails.getBranchId() != null) {
-            Branch targetBranch = branchRepository.findById(employeeDetails.getBranchId())
+            Branch targetBranch = branchRepository.findByIdForUpdate(employeeDetails.getBranchId())
                     .orElseThrow(() -> new RuntimeException("Branch not found"));
             accessControlService.requireManagerAccessToBranch(currentUser, targetBranch);
+            ensureBranchManagerAvailable(employeeDetails.getRole(), targetBranch, existingUser);
         }
 
         existingUser.setFullName(employeeDetails.getFullName());
@@ -129,12 +138,36 @@ public class EmployeeServiceImpl implements EmployeeService {
             existingUser.setStore(branch.getStore());
         }
 
+        Branch newBranch = existingUser.getBranch();
+        if (wasBranchManager && previousBranch != null
+                && (employeeDetails.getRole() != UserRole.ROLE_BRANCH_MANAGER || previousBranch != newBranch)) {
+            if (previousBranch.getManager() != null && previousBranch.getManager().getId().equals(existingUser.getId())) {
+                previousBranch.setManager(null);
+                branchRepository.save(previousBranch);
+            }
+        }
+
         User savedUser = userRepository.save(existingUser);
+        if (savedUser.getRole() == UserRole.ROLE_BRANCH_MANAGER && savedUser.getBranch() != null) {
+            savedUser.getBranch().setManager(savedUser);
+            branchRepository.save(savedUser.getBranch());
+        }
         return UserMapper.toDto(savedUser);
     }
 
+    private void ensureBranchManagerAvailable(UserRole role, Branch branch, User currentEmployee) throws UserException {
+        if (role != UserRole.ROLE_BRANCH_MANAGER || branch.getManager() == null) {
+            return;
+        }
+        if (currentEmployee != null && branch.getManager().getId().equals(currentEmployee.getId())) {
+            return;
+        }
+        throw new UserException("This branch already has a manager. Edit or remove the current manager before assigning another.");
+    }
+
     @Override
-    @CacheEvict(cacheNames = { "users", "usersAll" }, allEntries = true)
+    @CacheEvict(cacheNames = { "users", "usersAll", "branches", "branchesByStore" }, allEntries = true)
+    @Transactional
     public void deleteEmployee(Long employeeId) throws UserException {
         User existingUser = userRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
@@ -151,6 +184,17 @@ public class EmployeeServiceImpl implements EmployeeService {
             accessControlService.requireAdmin(currentUser);
         }
 
+        // Clear the owning branch relationship before deleting a manager. This
+        // also allows removal of stale manager accounts after a replacement.
+        if (existingUser.getBranch() != null) {
+            Branch branch = branchRepository.findByIdForUpdate(existingUser.getBranch().getId())
+                    .orElse(null);
+            if (branch != null && branch.getManager() != null
+                    && branch.getManager().getId().equals(existingUser.getId())) {
+                branch.setManager(null);
+                branchRepository.save(branch);
+            }
+        }
         userRepository.delete(existingUser);
     }
 

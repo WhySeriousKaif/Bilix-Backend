@@ -18,9 +18,10 @@ public interface RefundService {
     List<RefundDto> getRefundByCashierAndDateRange(Long cashierId, LocalDateTime startDate, LocalDateTime endDate) throws Exception;
     
     List<RefundDto> getRefundByBranch(Long branchId) throws Exception;
+
+    List<RefundDto> getRefundByOrder(Long orderId) throws Exception;
     
     RefundDto getRefundById(Long refundId) throws Exception;
     
     void deleteRefund(Long refundId) throws Exception;
 }
-

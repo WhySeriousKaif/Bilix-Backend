@@ -10,6 +10,11 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import com.molla.domain.UserRole;
+import java.util.Set;
 
 import java.util.List;
 
@@ -70,6 +75,19 @@ public class UserServiceImp implements UserService {
     @Cacheable(cacheNames = "usersAll")
     public List<User> getAllUsers() {
         return userRepository.findAll();
+    }
+
+    @Override
+    public Page<User> getUsersPaged(int page, int size, String sortBy, String direction, String search, UserRole role) {
+        page = Math.max(page, 0);
+        size = size <= 0 || size > 100 ? 10 : size;
+        Set<String> allowedSorts = Set.of("id", "fullName", "email", "role", "createdAt");
+        sortBy = allowedSorts.contains(sortBy) ? sortBy : "createdAt";
+        Sort sort = "asc".equalsIgnoreCase(direction)
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+        return userRepository.findAllFiltered(normalizedSearch, role, PageRequest.of(page, size, sort));
     }
 
     @Override

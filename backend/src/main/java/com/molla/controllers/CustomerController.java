@@ -17,6 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 
 import lombok.RequiredArgsConstructor;
 
@@ -47,6 +50,13 @@ public class CustomerController {
     @GetMapping 
     public ResponseEntity<List<Customer>> getAllCustomers() throws Exception {
         return ResponseEntity.ok(customerService.getAllCustomers());
+    }
+
+    @GetMapping("/paged")
+    public ResponseEntity<Page<Customer>> getCustomersPaged(
+            @RequestParam(value = "search", required = false) String search,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+        return ResponseEntity.ok(customerService.getCustomers(search, pageable));
     }
 
     @GetMapping("/{id}")

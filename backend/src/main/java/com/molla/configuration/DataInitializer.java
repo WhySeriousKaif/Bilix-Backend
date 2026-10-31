@@ -204,6 +204,7 @@ public class DataInitializer {
             if (catElectronics == null) {
                 catElectronics = new Category();
                 catElectronics.setName("Electronics");
+                catElectronics.setStore(store);
                 catElectronics = categoryRepository.save(catElectronics);
             }
 
@@ -211,6 +212,7 @@ public class DataInitializer {
             if (catBeverages == null) {
                 catBeverages = new Category();
                 catBeverages.setName("Beverages & Snacks");
+                catBeverages.setStore(store);
                 catBeverages = categoryRepository.save(catBeverages);
             }
 
@@ -218,6 +220,7 @@ public class DataInitializer {
             if (catFashion == null) {
                 catFashion = new Category();
                 catFashion.setName("Fashion & Apparel");
+                catFashion.setStore(store);
                 catFashion = categoryRepository.save(catFashion);
             }
 
@@ -225,6 +228,7 @@ public class DataInitializer {
             if (catHome == null) {
                 catHome = new Category();
                 catHome.setName("Home & Living");
+                catHome.setStore(store);
                 catHome = categoryRepository.save(catHome);
             }
 
@@ -530,4 +534,3 @@ public class DataInitializer {
         };
     }
 }
-

@@ -11,6 +11,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 
 @RestController
 @RequestMapping("/api/products")
@@ -75,6 +78,16 @@ public class ProductController {
     ) throws UserException {
 
         return ResponseEntity.ok(productService.getProductsById(storeId));
+    }
+
+    @GetMapping("/storeId/{storeId}/paged")
+    public ResponseEntity<Page<ProductDto>> getProductsPaged(
+            @PathVariable Long storeId,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable,
+            @RequestParam(required = false) String search,
+            @RequestHeader(value = "Authorization", required = false) String jwt
+    ) throws UserException {
+        return ResponseEntity.ok(productService.getProductsPaged(storeId, search, pageable));
     }
 
     @GetMapping("/search/{storeId}/{keyword}")

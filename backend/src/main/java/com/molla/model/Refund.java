@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Getter
@@ -39,6 +40,9 @@ public class Refund {
     @Enumerated(EnumType.STRING)
     private PaymentType paymentType;
 
+    @OneToMany(mappedBy = "refund", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RefundItem> items;
+
     private LocalDateTime createdAt;
 
     @PrePersist
@@ -46,4 +50,3 @@ public class Refund {
         createdAt = LocalDateTime.now();
     }
 }
-

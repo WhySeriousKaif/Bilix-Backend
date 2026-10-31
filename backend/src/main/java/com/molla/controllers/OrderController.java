@@ -3,6 +3,7 @@ package com.molla.controllers;
 import com.molla.domain.OrderStatus;
 import com.molla.domain.PaymentType;
 import com.molla.payload.dto.OrderDto;
+import com.molla.payload.dto.SystemSalesSummaryDto;
 import com.molla.payload.response.ApiResponse;
 import com.molla.service.OrderService;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +67,24 @@ public class OrderController {
     ) throws Exception {
         Page<OrderDto> result = orderService.getOrdersByBranchPaged(branchId, page, size, sortBy, direction);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/system/paged")
+    public ResponseEntity<Page<OrderDto>> getSystemSalesPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) Long storeId) {
+        return ResponseEntity.ok(orderService.getSystemSalesPaged(
+                page, size, sortBy, direction, search, status, storeId));
+    }
+
+    @GetMapping("/system/summary")
+    public ResponseEntity<SystemSalesSummaryDto> getSystemSalesSummary() {
+        return ResponseEntity.ok(orderService.getSystemSalesSummary());
     }
 
     @GetMapping("/cashier/{cashierId}")

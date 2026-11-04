@@ -1,0 +1,3 @@
+[submodule "pos-frontend"]
+	path = pos-frontend
+	url = https://github.com/WhySeriousKaif/pos-frontend.git

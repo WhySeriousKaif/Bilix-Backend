@@ -95,7 +95,7 @@ public class SecurityConfig {
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .authorizeHttpRequests(auth -> auth
                         // ⚠️ Public UI, H2 & Swagger paths MUST be first!
-                        .requestMatchers("/error", "/", "/h2-console/**", "/swagger-ui/**", "/swagger-ui.html", "/swagger-ui/index.html").permitAll()
+                        .requestMatchers("/error", "/health", "/", "/h2-console/**", "/swagger-ui/**", "/swagger-ui.html", "/swagger-ui/index.html").permitAll()
                         .requestMatchers("/api-docs/**", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
                         // 🔓 Public endpoints - no authentication required
                         .requestMatchers("/auth/**").permitAll()  // Login/signup endpoints

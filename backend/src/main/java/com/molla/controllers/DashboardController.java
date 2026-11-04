@@ -11,10 +11,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Read-only aggregates for the store-admin dashboard.
+ * Read-only aggregates for the store-admin and branch-manager dashboards.
  *
  * <p>Access is enforced in the service layer: a store admin may only ask for their own
- * store, a super admin for any store.
+ * store, a branch manager only for their own branch, a super admin for any of them.
  */
 @RestController
 @RequestMapping("/api/dashboard")
@@ -35,5 +35,18 @@ public class DashboardController {
             @RequestParam(required = false) String period,
             @RequestParam(required = false) String granularity) {
         return ResponseEntity.ok(dashboardService.getStoreDashboard(storeId, period, granularity));
+    }
+
+    /**
+     * Same aggregate scoped to a single branch, plus payment split, active staff and refunds.
+     *
+     * Example: GET /api/dashboard/branch/1?period=7D&granularity=DAILY
+     */
+    @GetMapping("/branch/{branchId}")
+    public ResponseEntity<StoreDashboardDto> getBranchDashboard(
+            @PathVariable("branchId") Long branchId,
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) String granularity) {
+        return ResponseEntity.ok(dashboardService.getBranchDashboard(branchId, period, granularity));
     }
 }

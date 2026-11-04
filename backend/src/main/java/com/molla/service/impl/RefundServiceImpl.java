@@ -225,6 +225,35 @@ public class RefundServiceImpl implements RefundService {
     }
 
     @Override
+    public org.springframework.data.domain.Page<RefundDto> getRefundByBranchPaged(
+            Long branchId, org.springframework.data.domain.Pageable pageable) {
+        return getRefundByBranchPaged(branchId, pageable, null, null, null);
+    }
+
+    @Override
+    public org.springframework.data.domain.Page<RefundDto> getRefundByBranchPaged(
+            Long branchId, org.springframework.data.domain.Pageable pageable,
+            String search, String payment, String period) {
+        accessControlService.requireBranchAccess(userService.getCurrentUser(), branchId);
+        LocalDateTime from = switch (period == null ? "all" : period.toLowerCase()) {
+            case "today" -> java.time.LocalDate.now().atStartOfDay();
+            case "week" -> java.time.LocalDate.now().minusDays(6).atStartOfDay();
+            case "month" -> java.time.LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            default -> null;
+        };
+        com.molla.domain.PaymentType paymentType = payment == null || payment.isBlank() || "all".equalsIgnoreCase(payment)
+                ? null : com.molla.domain.PaymentType.valueOf(payment.toUpperCase());
+        String term = search == null || search.isBlank() ? null : search.trim();
+        Long numericId = null;
+        if (term != null) {
+            try { numericId = Long.parseLong(term.replaceFirst("^#", "")); }
+            catch (NumberFormatException ignored) { /* Reason search. */ }
+        }
+        return refundRepository.findBranchRefundsFiltered(branchId, from, paymentType, term,
+                numericId, numericId, pageable).map(RefundMapper::toDto);
+    }
+
+    @Override
     public List<RefundDto> getRefundByOrder(Long orderId) throws Exception {
         Order order = orderRepository.findById(orderId)
             .orElseThrow(() -> new NotFoundException("Order not found"));

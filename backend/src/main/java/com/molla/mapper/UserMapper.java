@@ -6,7 +6,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 
-public class UserMapper {
+public final class UserMapper {
+
+    private UserMapper() {
+    }
 
     /**
      * 📦 Convert User Entity to User DTO
@@ -35,20 +38,11 @@ public class UserMapper {
         userDto.setPhone(newUser.getPhone());
         userDto.setRole(newUser.getRole());
         
-        // Set branchId and storeId if they exist
-        if (newUser.getBranch() != null) {
-            userDto.setBranchId(newUser.getBranch().getId());
-        }
-        if (newUser.getStore() != null) {
-            userDto.setStoreId(newUser.getStore().getId());
-
-        }
-        
         userDto.setCreatedAt(newUser.getCreatedAt());
         userDto.setUpdatedAt(newUser.getUpdatedAt());
         userDto.setLastLoginAt(newUser.getLastLoginAt());
-        userDto.setBranchId(newUser.getBranch()!=null?newUser.getBranch().getId():null);
-        userDto.setStoreId(newUser.getStore()!=null?newUser.getStore().getId():null );
+        userDto.setBranchId(newUser.getBranch() != null ? newUser.getBranch().getId() : null);
+        userDto.setStoreId(newUser.getStore() != null ? newUser.getStore().getId() : null);
         return userDto;
     }
 

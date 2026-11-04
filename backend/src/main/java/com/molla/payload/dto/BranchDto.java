@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.List;
+import jakarta.validation.constraints.NotBlank;
 
 @Data
 @NoArgsConstructor
@@ -17,6 +18,7 @@ public class BranchDto {
 
    
     private Long id;
+    @NotBlank(message = "Branch name is required")
     private String name;
 
     private  String phone;

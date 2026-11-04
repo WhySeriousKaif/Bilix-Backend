@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import jakarta.validation.constraints.Email;
 import lombok.*;
 
@@ -19,7 +20,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@jakarta.persistence.Table(name = "users")
+@Table(name = "users")
 public class User {
 
     @Override
@@ -52,32 +53,20 @@ public class User {
     private String password;
 
     @ManyToOne
-    private Store store; // manyToOne means - one user can have many stores
+    private Store store; // manyToOne means - One store can have multiple users.
 
     @ManyToOne
-    private Branch branch; // manyToOne means - one user can have many branches
+    private Branch branch; // manyToOne means -One branch can have multiple users.
 
     private String phone;
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING) // EnumType.STRING means - the role is stored as a string in the database //
-                                 // EnumType.ORDINAL means - the role is stored as a number in the database
-    private UserRole role;
+    private UserRole role;                            // EnumType.ORDINAL means - the role is stored as a number in the database
+
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime lastLoginAt;
-
-    public String getEmail() {
-        return email;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public UserRole getRole() {
-        return role;
-    }
 
 }

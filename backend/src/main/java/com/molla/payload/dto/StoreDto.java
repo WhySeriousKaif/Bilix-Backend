@@ -5,6 +5,8 @@ import com.molla.model.StoreContact;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 
 
 @Data
@@ -12,7 +14,8 @@ public class StoreDto {
 
     public Long id;
 
-    public  String brand;
+    @NotBlank(message = "Store brand is required")
+    public String brand;
 
     private UserDto  storeAdmin; //one store has one admin
 
@@ -28,5 +31,6 @@ public class StoreDto {
     private StoreStatus storeStatus;
 
 
+    @Valid
     private StoreContact contact;
 }

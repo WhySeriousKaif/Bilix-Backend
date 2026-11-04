@@ -2,54 +2,36 @@ package com.molla.controllers;
 
 import com.molla.mapper.UserMapper;
 import com.molla.model.User;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
+import lombok.RequiredArgsConstructor;
 
 import com.molla.service.UserService;
 import com.molla.payload.dto.UserDto;   
-import com.molla.exceptions.UserException;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import com.molla.domain.UserRole;
 
 @RestController
 @RequestMapping("/api/users")
+@RequiredArgsConstructor
 public class UserController {
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
     @GetMapping("/profile")
-
-    public ResponseEntity<UserDto> getUserProfile(@RequestHeader(value = "Authorization", required = false) String jwt) throws UserException {
-        // For testing, if no JWT, return a default user with branch
-        if (jwt == null || jwt.isEmpty()) {
-            UserDto defaultUser = new UserDto();
-            defaultUser.setId(1L);
-            defaultUser.setFullName("Test Cashier");
-            defaultUser.setEmail("cashier@test.com");
-            defaultUser.setBranchId(1L);
-            return ResponseEntity.ok(defaultUser);
-        }
-        User user = userService.getUserFromJwt(jwt);
-        return  ResponseEntity.ok(UserMapper.toDto(user));
-
+    public ResponseEntity<UserDto> getUserProfile() {
+        return ResponseEntity.ok(UserMapper.toDto(userService.getCurrentUser()));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UserDto> getUserById(@PathVariable("id") Long id ) throws UserException {
-        User user = userService.getUserById(id);
-        if(user==null){
-            throw new UserException("User not found");
-        }
-        return  ResponseEntity.ok(UserMapper.toDto(user));
+    public ResponseEntity<UserDto> getUserById(@PathVariable("id") Long id) {
+        return ResponseEntity.ok(UserMapper.toDto(userService.getUserById(id)));
 
     }
     @GetMapping("/all")
-    public ResponseEntity<List<UserDto>> getAllUsers() throws UserException {
+    public ResponseEntity<List<UserDto>> getAllUsers() {
         List<User> users = userService.getAllUsers();
-        return ResponseEntity.ok(users.stream().map(UserMapper::toDto).collect(Collectors.toList()));
+        return ResponseEntity.ok(users.stream().map(UserMapper::toDto).toList());
     }
 
     @GetMapping("/paged")

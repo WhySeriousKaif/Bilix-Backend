@@ -63,9 +63,14 @@ public class OrderController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String direction
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String payment,
+            @RequestParam(required = false) String period
     ) throws Exception {
-        Page<OrderDto> result = orderService.getOrdersByBranchPaged(branchId, page, size, sortBy, direction);
+        Page<OrderDto> result = orderService.getOrdersByBranchPaged(branchId, page, size, sortBy, direction,
+                search, status, payment, period);
         return ResponseEntity.ok(result);
     }
 

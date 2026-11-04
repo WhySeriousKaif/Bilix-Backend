@@ -6,7 +6,6 @@ import com.molla.exceptions.NotFoundException;
 import com.molla.mapper.CategoryMapper;
 import com.molla.model.Category;
 import com.molla.model.Store;
-import com.molla.model.User;
 import com.molla.payload.dto.CategoryDto;
 import com.molla.repository.CategoryRepository;
 import com.molla.repository.ProductRepository;
@@ -36,13 +35,13 @@ public class CategoryServiceImp implements CategoryService {
 
     @Override
     @CacheEvict(cacheNames = "categoriesByStore", allEntries = true)
-    public CategoryDto createCategory(CategoryDto categoryDto, User user) {
+    public CategoryDto createCategory(CategoryDto categoryDto) {
         if (categoryDto.getStoreId() == null) {
             throw new BadRequestException("You need to create a store before adding categories.");
         }
         Store store = storeRepository.findById(categoryDto.getStoreId())
                 .orElseThrow(() -> new NotFoundException("Store not found with id: " + categoryDto.getStoreId()));
-        checkAuthority(user, store);
+        checkAuthority(store);
 
         String normalizedName = normalizeDisplayName(categoryDto.getName());
         if (normalizedName.isBlank()) {
@@ -75,7 +74,7 @@ public class CategoryServiceImp implements CategoryService {
 
     @Override
     @CacheEvict(cacheNames = "categoriesByStore", allEntries = true)
-    public CategoryDto updateCategory(Long id, CategoryDto categoryDto, User user) {
+    public CategoryDto updateCategory(Long id, CategoryDto categoryDto) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Category not found with id: " + id));
 
@@ -85,16 +84,16 @@ public class CategoryServiceImp implements CategoryService {
                 .ifPresent(existing -> { throw new BadRequestException("Category already exists"); });
         category.setName(normalizedName);
         category.setDescription(categoryDto.getDescription());
-        checkAuthority(user, category.getStore()); 
+        checkAuthority(category.getStore());
 
         return CategoryMapper.toDto(categoryRepository.save(category));
     }
     
     @Override
-    public CategoryDto moderateCategory(Long id, CategoryDto categoryDto, User user) {
+    public CategoryDto moderateCategory(Long id, CategoryDto categoryDto) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Category not found with id: " + id));
-        checkAuthority(user, category.getStore());
+        checkAuthority(category.getStore());
         
         category.setName(categoryDto.getName());
         category.setDescription(categoryDto.getDescription());
@@ -103,21 +102,21 @@ public class CategoryServiceImp implements CategoryService {
     
     @Override
     @CacheEvict(cacheNames = "categoriesByStore", allEntries = true)
-    public void deleteCategory(Long id, User user) {
+    public void deleteCategory(Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Category not found with id: " + id));
-        checkAuthority(user, category.getStore()); 
+        checkAuthority(category.getStore());
         categoryRepository.delete(category);
     }
 
-    private void checkAuthority(User user, Store store) {
+    private void checkAuthority(Store store) {
         if (store == null) {
             throw new NotFoundException("Store not found");
         }
         // Was previously checking "is this user *a* store admin/manager" (any store),
         // not "is this user the admin/manager *of this store*" — letting any store admin
         // touch any other store's categories. requireStoreAccess scopes it correctly.
-        accessControlService.requireStoreAccess(user, store.getId());
+        accessControlService.requireStoreAccess(userService.getCurrentUser(), store.getId());
     }
 
     private List<Category> mergeDuplicateCategories(Long storeId) {

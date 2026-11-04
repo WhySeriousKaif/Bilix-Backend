@@ -24,7 +24,6 @@ public class BranchMapper {
     }
     public static Branch toEntity(BranchDto branchDto,Store store) {
         return Branch.builder()
-        .id(branchDto.getId())
         .name(branchDto.getName())
         .phone(branchDto.getPhone())
         .address(branchDto.getAddress())
@@ -33,8 +32,6 @@ public class BranchMapper {
         .workingDays(branchDto.getWorkingDays())
         .openTime(branchDto.getOpenTime())
         .closeTime(branchDto.getCloseTime())
-        .createdAt(branchDto.getCreatedAt())
-        .updatedAt(branchDto.getUpdatedAt())
         .build();
     }
 }

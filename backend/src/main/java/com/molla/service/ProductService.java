@@ -1,6 +1,5 @@
 package com.molla.service;
 
-import com.molla.model.User;
 import com.molla.payload.dto.ProductDto;
 
 import java.util.List;
@@ -9,9 +8,9 @@ import org.springframework.data.domain.Pageable;
 
 public interface ProductService {
 
-    ProductDto createProduct(ProductDto productDto, User user) ;
-    ProductDto updateProduct(Long id, ProductDto productDto,User user) ;
-    void deleteProduct(Long id,User user);
+    ProductDto createProduct(ProductDto productDto);
+    ProductDto updateProduct(Long id, ProductDto productDto);
+    void deleteProduct(Long id);
     List<ProductDto>getProductsById(Long storeId) ;
     Page<ProductDto> getProductsPaged(Long storeId, Pageable pageable);
     Page<ProductDto> getProductsPaged(Long storeId, String search, Pageable pageable);

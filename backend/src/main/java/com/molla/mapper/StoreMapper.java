@@ -3,6 +3,7 @@ package com.molla.mapper;
 import com.molla.model.Store;
 import com.molla.model.User;
 import com.molla.payload.dto.StoreDto;
+import com.molla.domain.StoreStatus;
 
 public class StoreMapper {
 
@@ -27,15 +28,13 @@ public class StoreMapper {
 
     public static Store toEntity(StoreDto storeDto, User user){
         Store store = new Store();
-        store.setId(storeDto.getId());
         store.setBrand(storeDto.getBrand());
         store.setDescription(storeDto.getDescription());
         store.setStoreAdmin(user);
         store.setStoreType(storeDto.getStoreType());
         store.setContact(storeDto.getContact());
-        store.setCreatedAt(storeDto.getCreatedAt());
-        store.setUpdatedAt(storeDto.getUpdatedAt());
-        store.setStoreStatus(storeDto.getStoreStatus());
+        // Identity, timestamps, and moderation state are owned by the server.
+        store.setStoreStatus(StoreStatus.PENDING);
 
         return store;
     }

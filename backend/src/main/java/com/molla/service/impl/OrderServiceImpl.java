@@ -20,6 +20,7 @@ import com.molla.repository.OrderRepository;
 import com.molla.repository.ProductRepository;
 import com.molla.repository.RefundRepository;
 import com.molla.repository.UserRepository;
+import com.molla.repository.InventoryRepository;
 import com.molla.service.OrderService;
 import com.molla.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -50,8 +52,10 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final AccessControlService accessControlService;
     private final RefundRepository refundRepository;
+    private final InventoryRepository inventoryRepository;
 
     @Override
+    @Transactional
     @CacheEvict(cacheNames = { "productsByStore", "productsAll", "orders", "recentOrdersByBranch" }, allEntries = true)
     public OrderDto createOrder(OrderDto orderDto) throws Exception {
         // The order is always attributed to whoever is actually authenticated —
@@ -76,7 +80,7 @@ public class OrderServiceImpl implements OrderService {
                 .cashier(cashier)
                 .customer(customer)
                 .paymentType(orderDto.getPaymentType())
-                .status(orderDto.getStatus() != null ? orderDto.getStatus() : OrderStatus.PENDING)
+                .status(OrderStatus.COMPLETED)
                 .build();
 
         // Create order items
@@ -84,7 +88,11 @@ public class OrderServiceImpl implements OrderService {
             throw new BadRequestException("Order must have at least one item");
         }
 
-        List<OrderItem> orderItems = orderDto.getOrderItems().stream().map((OrderItemDto itemDto) -> {
+        List<OrderItem> orderItems = orderDto.getOrderItems().stream()
+                .sorted(java.util.Comparator.comparing(item -> item.getProductId() != null
+                        ? item.getProductId()
+                        : item.getProduct() != null ? item.getProduct().getId() : Long.MAX_VALUE))
+                .map((OrderItemDto itemDto) -> {
             // Get product - check if productId is provided, otherwise use product.getId()
             final Long productId;
             if (itemDto.getProductId() != null) {
@@ -97,33 +105,36 @@ public class OrderServiceImpl implements OrderService {
 
             Product product = productRepository.findById(productId)
                     .orElseThrow(() -> new NotFoundException("Product not found with id: " + productId));
+            if (product.getStore() == null || branch.getStore() == null
+                    || !product.getStore().getId().equals(branch.getStore().getId())) {
+                throw new BadRequestException("Product does not belong to this branch's store");
+            }
 
-            Double itemPrice = itemDto.getPrice();
-            if (itemPrice == null) {
-                if (product.getPrice() != null) {
-                    itemPrice = product.getPrice();
-                } else if (product.getSellingPrice() != null) {
-                    itemPrice = product.getSellingPrice();
-                } else if (product.getMrp() != null) {
-                    itemPrice = product.getMrp();
-                } else {
-                    throw new BadRequestException("Product price is missing for product: " + product.getName());
-                }
+            Double itemPrice;
+            if (product.getPrice() != null) {
+                itemPrice = product.getPrice();
+            } else if (product.getSellingPrice() != null) {
+                itemPrice = product.getSellingPrice();
+            } else if (product.getMrp() != null) {
+                itemPrice = product.getMrp();
+            } else {
+                throw new BadRequestException("Product price is missing for product: " + product.getName());
             }
             Integer quantity = itemDto.getQuantity() != null ? itemDto.getQuantity() : 1;
-            Double totalPrice = itemPrice * quantity;
-
-            // Deduct sold quantity from stock so the catalog (and every dashboard reading it)
-            // reflects what's actually left on the shelf.
-            if (product.getQuantity() != null) {
-                if (product.getQuantity() < quantity) {
-                    throw new BadRequestException(
-                            "Not enough stock for " + product.getName() + " (available: " + product.getQuantity()
-                                    + ", requested: " + quantity + ")");
-                }
-                product.setQuantity(product.getQuantity() - quantity);
-                productRepository.save(product);
+            if (quantity <= 0) {
+                throw new BadRequestException("Quantity must be positive for " + product.getName());
             }
+
+            var inventory = inventoryRepository.findByProductIdAndBranchIdForUpdate(productId, branch.getId())
+                    .orElseThrow(() -> new BadRequestException("Product is not stocked at this branch: " + product.getName()));
+            if (inventory.getQuantity() < quantity) {
+                throw new BadRequestException("Not enough stock for " + product.getName() + " (available: "
+                        + inventory.getQuantity() + ", requested: " + quantity + ")");
+            }
+            inventory.setQuantity(inventory.getQuantity() - quantity);
+            inventoryRepository.save(inventory);
+
+            Double totalPrice = itemPrice * quantity;
 
             return OrderItem.builder()
                     .product(product)
@@ -246,12 +257,18 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Page<OrderDto> getOrdersByBranchPaged(Long branchId, int page, int size, String sortBy, String direction)
             throws Exception {
+        return getOrdersByBranchPaged(branchId, page, size, sortBy, direction, null, null, null, null);
+    }
+
+    @Override
+    public Page<OrderDto> getOrdersByBranchPaged(Long branchId, int page, int size, String sortBy, String direction,
+            String search, String status, String payment, String period) throws Exception {
         accessControlService.requireBranchAccess(userService.getCurrentUser(), branchId);
         if (page < 0)
             page = 0;
         if (size <= 0 || size > 100)
             size = 10;
-        if (sortBy == null || sortBy.isBlank()) {
+        if (sortBy == null || !Set.of("id", "createdAt", "totalAmount").contains(sortBy)) {
             sortBy = "createdAt";
         }
         if (direction == null || direction.isBlank()) {
@@ -264,7 +281,24 @@ public class OrderServiceImpl implements OrderService {
 
         PageRequest pageable = PageRequest.of(page, size, sort);
 
-        Page<Order> pageResult = orderRepository.findByBranchId(branchId, pageable);
+        LocalDateTime from = switch (period == null ? "all" : period.toLowerCase()) {
+            case "today" -> LocalDate.now().atStartOfDay();
+            case "week" -> LocalDate.now().minusDays(6).atStartOfDay();
+            case "month" -> LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            default -> null;
+        };
+        OrderStatus orderStatus = status == null || status.isBlank() || "all".equalsIgnoreCase(status)
+                ? null : OrderStatus.valueOf(status.toUpperCase());
+        PaymentType paymentType = payment == null || payment.isBlank() || "all".equalsIgnoreCase(payment)
+                ? null : PaymentType.valueOf(payment.toUpperCase());
+        String term = search == null || search.isBlank() ? null : search.trim();
+        Long orderId = null;
+        if (term != null) {
+            try { orderId = Long.parseLong(term.replaceFirst("^#", "")); }
+            catch (NumberFormatException ignored) { /* Name search. */ }
+        }
+        Page<Order> pageResult = orderRepository.findBranchOrdersFiltered(
+                branchId, from, orderStatus, paymentType, term, orderId, pageable);
         return pageResult.map(OrderMapper::toDto);
     }
 

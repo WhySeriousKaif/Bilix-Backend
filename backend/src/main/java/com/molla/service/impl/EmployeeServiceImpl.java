@@ -20,11 +20,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class EmployeeServiceImpl implements EmployeeService {
+    private static final Set<UserRole> STORE_CREATION_ROLES = Set.of(
+            UserRole.ROLE_STORE_MANAGER, UserRole.ROLE_STORE_EMPLOYEE,
+            UserRole.ROLE_BRANCH_MANAGER, UserRole.ROLE_BRANCH_CASHIER);
+
     private final UserRepository userRepository;
     private final StoreRepository storeRepository;
     private final BranchRepository branchRepository;
@@ -36,17 +41,28 @@ public class EmployeeServiceImpl implements EmployeeService {
     @CacheEvict(cacheNames = { "users", "usersAll", "branches", "branchesByStore" }, allEntries = true)
     @Transactional
     public UserDto createStoreEmployee(UserDto employee, Long storeId) throws UserException {
+
         accessControlService.requireManagerAccessToStore(userService.getCurrentUser(), storeId);
+
+        if (!STORE_CREATION_ROLES.contains(employee.getRole())) {
+            throw new BadRequestException("Invalid role for store employee");
+        }
         Store store = storeRepository.findById(storeId).orElseThrow(() -> new RuntimeException("Store not found"));
+
         Branch branch = null; // branch stays null for store-level roles (Store Manager, Store Employee)
+
         boolean isBranchScopedRole = employee.getRole() == UserRole.ROLE_BRANCH_MANAGER
                 || employee.getRole() == UserRole.ROLE_BRANCH_CASHIER;
+
         if (isBranchScopedRole) {
             if (employee.getBranchId() == null) {
                 throw new UserException("Branch ID is required for this role");
             }
             branch = branchRepository.findByIdForUpdate(employee.getBranchId())
                     .orElseThrow(() -> new RuntimeException("Branch not found"));
+            if (branch.getStore() == null || !storeId.equals(branch.getStore().getId())) {
+                throw new BadRequestException("Selected branch does not belong to this store");
+            }
             ensureBranchManagerAvailable(employee.getRole(), branch, null);
         }
 
@@ -111,36 +127,48 @@ public class EmployeeServiceImpl implements EmployeeService {
             accessControlService.requireAdmin(currentUser);
         }
 
-        // If moving the employee to a different branch, the caller needs authority there too
+        UserRole nextRole = employeeDetails.getRole() != null ? employeeDetails.getRole() : existingUser.getRole();
+        if (nextRole != existingUser.getRole()
+                && (nextRole == UserRole.ROLE_ADMIN || nextRole == UserRole.ROLE_STORE_ADMIN)) {
+            throw new BadRequestException("Cannot assign an admin role through employee management");
+        }
+
+        // Check the target branch even when a promotion omits branchId.
+        Branch targetBranch = null;
         if (employeeDetails.getBranchId() != null) {
-            Branch targetBranch = branchRepository.findByIdForUpdate(employeeDetails.getBranchId())
+            targetBranch = branchRepository.findByIdForUpdate(employeeDetails.getBranchId())
                     .orElseThrow(() -> new RuntimeException("Branch not found"));
             accessControlService.requireManagerAccessToBranch(currentUser, targetBranch);
-            ensureBranchManagerAvailable(employeeDetails.getRole(), targetBranch, existingUser);
+        } else if (nextRole == UserRole.ROLE_BRANCH_MANAGER && previousBranch != null) {
+            targetBranch = branchRepository.findByIdForUpdate(previousBranch.getId())
+                    .orElseThrow(() -> new RuntimeException("Branch not found"));
+        }
+
+        if (nextRole == UserRole.ROLE_BRANCH_MANAGER) {
+            if (targetBranch == null) {
+                throw new UserException("Branch ID is required for this role");
+            }
+            ensureBranchManagerAvailable(nextRole, targetBranch, existingUser);
         }
 
         existingUser.setFullName(employeeDetails.getFullName());
         existingUser.setEmail(employeeDetails.getEmail());
         existingUser.setPhone(employeeDetails.getPhone());
-        existingUser.setRole(employeeDetails.getRole());
+        existingUser.setRole(nextRole);
 
         // Only update password if provided
         if (employeeDetails.getPassword() != null && !employeeDetails.getPassword().isEmpty()) {
             existingUser.setPassword(passwordEncoder.encode(employeeDetails.getPassword()));
         }
 
-        // Update branch if branchId is provided
         if (employeeDetails.getBranchId() != null) {
-            Branch branch = branchRepository.findById(employeeDetails.getBranchId())
-                    .orElseThrow(() -> new RuntimeException("Branch not found"));
-            existingUser.setBranch(branch);
-            // Update store from branch
-            existingUser.setStore(branch.getStore());
+            existingUser.setBranch(targetBranch);
+            existingUser.setStore(targetBranch.getStore());
         }
 
         Branch newBranch = existingUser.getBranch();
         if (wasBranchManager && previousBranch != null
-                && (employeeDetails.getRole() != UserRole.ROLE_BRANCH_MANAGER || previousBranch != newBranch)) {
+                && (nextRole != UserRole.ROLE_BRANCH_MANAGER || previousBranch != newBranch)) {
             if (previousBranch.getManager() != null && previousBranch.getManager().getId().equals(existingUser.getId())) {
                 previousBranch.setManager(null);
                 branchRepository.save(previousBranch);

@@ -58,11 +58,11 @@ public class StripeController {
             return ResponseEntity.ok(response);
         } catch (StripeException e) {
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Error creating checkout session: " + e.getMessage());
+            errorResponse.put("error", "Unable to create checkout session");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         } catch (Exception e) {
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Unexpected error: " + e.getMessage());
+            errorResponse.put("error", "Unable to create checkout session");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }

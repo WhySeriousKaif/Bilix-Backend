@@ -23,6 +23,8 @@ public interface OrderService {
      * Paginated + sorted orders listing for a branch.
      */
     Page<OrderDto> getOrdersByBranchPaged(Long branchId, int page, int size, String sortBy, String direction) throws Exception;
+    Page<OrderDto> getOrdersByBranchPaged(Long branchId, int page, int size, String sortBy, String direction,
+            String search, String status, String payment, String period) throws Exception;
 
     Page<OrderDto> getSystemSalesPaged(int page, int size, String sortBy, String direction,
             String search, OrderStatus status, Long storeId);

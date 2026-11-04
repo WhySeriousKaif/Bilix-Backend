@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.molla.model.Customer;
 import com.molla.service.CustomerService;
 import com.molla.payload.response.ApiResponse;
+import com.molla.payload.dto.BranchCustomerDto;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,25 +31,36 @@ public class CustomerController {
 
     private final CustomerService customerService;
 
+    @GetMapping("/branch/{branchId}/paged")
+    public ResponseEntity<Page<BranchCustomerDto>> getBranchCustomersPaged(
+            @PathVariable("branchId") Long branchId,
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(customerService.getBranchCustomers(branchId, search, page, size));
+    }
+
     @PostMapping
     public ResponseEntity<Customer> createCustomer(@RequestBody Customer customer) {
         return ResponseEntity.ok(customerService.createCustomer(customer));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Customer> updateCustomer(@PathVariable("id") Long id,@RequestBody Customer customer) throws Exception {
+    public ResponseEntity<Customer> updateCustomer(
+            @PathVariable("id") Long id,
+            @RequestBody Customer customer) {
         return ResponseEntity.ok(customerService.updateCustomer(customer, id));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse> deleteCustomer(@PathVariable("id") Long id) throws Exception {
+    public ResponseEntity<ApiResponse> deleteCustomer(@PathVariable("id") Long id) {
         customerService.deleteCustomer(id);
         return ResponseEntity.ok(new ApiResponse("Customer deleted successfully"));
     }
 
 
     @GetMapping 
-    public ResponseEntity<List<Customer>> getAllCustomers() throws Exception {
+    public ResponseEntity<List<Customer>> getAllCustomers() {
         return ResponseEntity.ok(customerService.getAllCustomers());
     }
 
@@ -56,23 +68,23 @@ public class CustomerController {
     public ResponseEntity<Page<Customer>> getCustomersPaged(
             @RequestParam(value = "search", required = false) String search,
             @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
-        return ResponseEntity.ok(customerService.getCustomers(search, pageable));
+        return ResponseEntity.ok(customerService.getCustomersForCurrentUser(search, pageable));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Customer> getCustomerById(@PathVariable("id") Long id) throws Exception {
+    public ResponseEntity<Customer> getCustomerById(@PathVariable("id") Long id) {
         return ResponseEntity.ok(customerService.getCustomerById(id));
     }
 
     @GetMapping("/search")
     public ResponseEntity<List<Customer>> searchCustomers(
             @RequestParam(value = "keyword", required = false) String keyword,
-            @RequestParam(value = "q", required = false) String q) throws Exception {
+            @RequestParam(value = "q", required = false) String q) {
         // Accept both 'keyword' and 'q' parameters
         String searchTerm = keyword != null ? keyword : (q != null ? q : "");
         if (searchTerm.isEmpty()) {
             throw new IllegalArgumentException("Either 'keyword' or 'q' parameter is required");
         }
-        return ResponseEntity.ok(customerService.searchCustomers(searchTerm));
+        return ResponseEntity.ok(customerService.searchCustomersForCurrentUser(searchTerm));
     }
 }

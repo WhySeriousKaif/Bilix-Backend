@@ -23,7 +23,7 @@ public interface StoreService {
 
    void deleteStore(Long id);
    
-   StoreDto getStoreByEmployee(String brand);
+   StoreDto getStoreByEmployee();
 
    StoreDto moderateStore(Long id, StoreStatus storeStatus);
 

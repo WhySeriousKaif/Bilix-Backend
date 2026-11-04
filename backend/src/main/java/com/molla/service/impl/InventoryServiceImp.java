@@ -91,4 +91,11 @@ public class InventoryServiceImp implements InventoryService {
                 .map(InventoryMapper::toDto)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public org.springframework.data.domain.Page<InventoryDto> getInventoriesByBranchPaged(
+            Long branchId, org.springframework.data.domain.Pageable pageable) {
+        accessControlService.requireBranchAccess(userService.getCurrentUser(), branchId);
+        return inventoryRepository.findByBranchId(branchId, pageable).map(InventoryMapper::toDto);
+    }
 }

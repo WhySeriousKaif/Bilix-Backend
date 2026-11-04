@@ -4,6 +4,8 @@ import com.molla.payload.dto.RefundDto;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface RefundService {
     
@@ -18,6 +20,9 @@ public interface RefundService {
     List<RefundDto> getRefundByCashierAndDateRange(Long cashierId, LocalDateTime startDate, LocalDateTime endDate) throws Exception;
     
     List<RefundDto> getRefundByBranch(Long branchId) throws Exception;
+    Page<RefundDto> getRefundByBranchPaged(Long branchId, Pageable pageable);
+    Page<RefundDto> getRefundByBranchPaged(Long branchId, Pageable pageable,
+            String search, String payment, String period);
 
     List<RefundDto> getRefundByOrder(Long orderId) throws Exception;
     

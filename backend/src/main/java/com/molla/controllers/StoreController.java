@@ -10,7 +10,9 @@ import com.molla.service.StoreService;
 import com.molla.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -23,22 +25,19 @@ public class StoreController {
     private final UserService userService;
 
     @PostMapping
-    public ResponseEntity<StoreDto> createStore(@RequestBody StoreDto storeDto,
+    public ResponseEntity<StoreDto> createStore(@Valid @RequestBody StoreDto storeDto,
             @RequestHeader("Authorization") String jwt) throws UserException {
         User user = userService.getUserFromJwt(jwt);
-        return ResponseEntity.ok(storeService.createStore(storeDto, user));
+        return ResponseEntity.status(HttpStatus.CREATED).body(storeService.createStore(storeDto, user));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<StoreDto> getStoreById(@PathVariable("id") Long id,
-            @RequestHeader("Authorization") String jwt) throws UserException {
-
+    public ResponseEntity<StoreDto> getStoreById(@PathVariable("id") Long id) {
         return ResponseEntity.ok(storeService.getStoreById(id));
     }
 
     @GetMapping
-    public ResponseEntity<List<StoreDto>> getAllStores(@RequestHeader("Authorization") String jwt)
-            throws UserException {
+    public ResponseEntity<List<StoreDto>> getAllStores() {
         return ResponseEntity.ok(storeService.getAllStores());
     }
 
@@ -50,11 +49,8 @@ public class StoreController {
     }
 
     @GetMapping("/employee")
-    public ResponseEntity<StoreDto> getStoreByEmployee(@RequestHeader("Authorization") String jwt)
-            throws UserException {
-        User user = userService.getUserFromJwt(jwt);
-        String brand = user.getStore() != null ? user.getStore().getBrand() : "";
-        return ResponseEntity.ok(storeService.getStoreByEmployee(brand));
+    public ResponseEntity<StoreDto> getStoreByEmployee() {
+        return ResponseEntity.ok(storeService.getStoreByEmployee());
     }
 
     @GetMapping("/my")
@@ -71,14 +67,12 @@ public class StoreController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<StoreDto> updateStore(@PathVariable("id") Long id, @RequestBody StoreDto storeDto,
-            @RequestHeader("Authorization") String jwt) throws UserException {
+    public ResponseEntity<StoreDto> updateStore(@PathVariable("id") Long id, @RequestBody StoreDto storeDto) {
         return ResponseEntity.ok(storeService.updateStore(id, storeDto));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse> deleteStore(@PathVariable("id") Long id,
-            @RequestHeader("Authorization") String jwt) throws UserException {
+    public ResponseEntity<ApiResponse> deleteStore(@PathVariable("id") Long id) {
         storeService.deleteStore(id);
         ApiResponse apiResponse = new ApiResponse("Store deleted successfully");
         return ResponseEntity.ok(apiResponse);
@@ -87,10 +81,7 @@ public class StoreController {
     @PutMapping("/{id}/moderate")
     public ResponseEntity<StoreDto> moderateStore(
             @PathVariable("id") Long id,
-            @RequestBody StoreStatusDto storeStatusDto,
-            @RequestHeader("Authorization") String jwt) throws UserException {
-        // Validate JWT token - service layer will check if user is Super Admin
-        userService.getUserFromJwt(jwt);
+            @RequestBody StoreStatusDto storeStatusDto) {
         return ResponseEntity.ok(storeService.moderateStore(id, storeStatusDto.getStatus()));
     }
 

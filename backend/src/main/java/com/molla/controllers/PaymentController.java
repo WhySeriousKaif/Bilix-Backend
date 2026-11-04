@@ -42,13 +42,13 @@ public class PaymentController {
             String message = e.getMessage() != null ? e.getMessage() : "";
             if (message.toLowerCase().contains("authentication") || message.toLowerCase().contains("key_id")) {
                 return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                        .body(Map.of("error", "Razorpay rejected our API credentials: " + message));
+                        .body(Map.of("error", "Payment provider is temporarily unavailable"));
             }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error creating order: " + message));
+                    .body(Map.of("error", "Unable to create payment order"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error creating order: " + e.getMessage()));
+                    .body(Map.of("error", "Unable to create payment order"));
         }
     }
 

@@ -1,6 +1,7 @@
 package com.molla.exceptions;
 
 import io.swagger.v3.oas.annotations.Hidden;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,23 +28,33 @@ import java.util.Map;
  * status
  */
 @Hidden // 🔇 Hide from Swagger UI (not an API endpoint)
-@lombok.extern.slf4j.Slf4j
+@Slf4j
 @RestControllerAdvice(basePackages = "com.molla.controllers")
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(BadRequestException ex) {
-        return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", ex.getMessage());
+        return build(
+                HttpStatus.BAD_REQUEST,
+                "BAD_REQUEST",
+                ex.getMessage());
     }
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(NotFoundException ex) {
-        return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage());
+        return build(
+                HttpStatus.NOT_FOUND,
+                "NOT_FOUND",
+                ex.getMessage());
     }
 
     @ExceptionHandler(UserException.class)
     public ResponseEntity<Map<String, Object>> handleUserException(UserException ex) {
-        return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", ex.getMessage());
+        return build(
+                HttpStatus.BAD_REQUEST,
+                "BAD_REQUEST",
+                ex.getMessage()
+        );
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -65,7 +76,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleOther(Exception ex) {
         log.error("Unexpected error occurred: ", ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR",
-                ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred");
+                "An unexpected error occurred");
     }
 
     /**

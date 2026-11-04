@@ -39,8 +39,7 @@ public class Branch {
     @ManyToOne
     private Store store; // many branches belong to one store
 
-    @OneToOne(cascade = CascadeType.REMOVE) // CascadeType.REMOVE means - when the branch is deleted, the manager is
-                                            // also deleted
+    @OneToOne
     private User manager; // one branch has one manager
 
     @PreUpdate // PreUpdate means - before the branch is updated, the updatedAt is set to the
@@ -53,6 +52,7 @@ public class Branch {
                 // current time
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        updatedAt = createdAt;
     }
 
     @Override

@@ -1,18 +1,17 @@
 package com.molla.service;
 
-import com.molla.model.User;
 import com.molla.payload.dto.CategoryDto;
 
 import java.util.List;
 
 public interface CategoryService {
-    CategoryDto createCategory(CategoryDto categoryDto, User user);
+    CategoryDto createCategory(CategoryDto categoryDto);
 
-    CategoryDto updateCategory(Long id, CategoryDto categoryDto, User user);
+    CategoryDto updateCategory(Long id, CategoryDto categoryDto);
 
-    void deleteCategory(Long id, User user);
+    void deleteCategory(Long id);
 
     List<CategoryDto> getCategoriesByStoreId(Long storeId);
     
-    CategoryDto moderateCategory(Long id, CategoryDto categoryDto, User user);
+    CategoryDto moderateCategory(Long id, CategoryDto categoryDto);
 }

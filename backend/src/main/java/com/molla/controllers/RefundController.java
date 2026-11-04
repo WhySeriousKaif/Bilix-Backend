@@ -10,6 +10,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 @RestController
 @RequestMapping("/api/refunds")
@@ -40,6 +44,22 @@ public class RefundController {
     public ResponseEntity<List<RefundDto>> getRefundByBranch(@PathVariable("branchId") Long branchId) throws Exception {
         List<RefundDto> refunds = refundService.getRefundByBranch(branchId);
         return ResponseEntity.ok(refunds);
+    }
+
+    @GetMapping("/branch/{branchId}/paged")
+    public ResponseEntity<Page<RefundDto>> getRefundByBranchPaged(
+            @PathVariable("branchId") Long branchId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String payment,
+            @RequestParam(required = false) String period) {
+        String field = List.of("id", "createdAt", "amount").contains(sortBy) ? sortBy : "createdAt";
+        Sort sort = direction.equalsIgnoreCase("asc") ? Sort.by(field).ascending() : Sort.by(field).descending();
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(1, Math.min(size, 100)), sort);
+        return ResponseEntity.ok(refundService.getRefundByBranchPaged(branchId, pageable, search, payment, period));
     }
 
     @GetMapping("/shift/{shiftReportId}")

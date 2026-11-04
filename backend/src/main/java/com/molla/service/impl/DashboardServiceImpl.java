@@ -1,15 +1,19 @@
 package com.molla.service.impl;
 
 import com.molla.domain.OrderStatus;
+import com.molla.domain.PaymentType;
 import com.molla.exceptions.BadRequestException;
+import com.molla.exceptions.NotFoundException;
 import com.molla.model.Branch;
 import com.molla.model.Order;
 import com.molla.model.OrderItem;
-import com.molla.model.User;
+import com.molla.model.Refund;
 import com.molla.payload.dto.StoreDashboardDto;
 import com.molla.payload.dto.StoreDashboardDto.*;
 import com.molla.repository.BranchRepository;
 import com.molla.repository.OrderRepository;
+import com.molla.repository.RefundRepository;
+import com.molla.repository.UserRepository;
 import com.molla.service.DashboardService;
 import com.molla.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +35,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Builds the store-admin dashboard from real order rows.
+ * Builds the store-admin and branch-manager dashboards from real order rows.
  *
  * <p>One page load issues two range queries (current window + the equally long window
  * directly before it) instead of one request per branch, then derives every figure the
@@ -51,15 +55,48 @@ public class DashboardServiceImpl implements DashboardService {
     private final AccessControlService accessControlService;
     private final OrderRepository orderRepository;
     private final BranchRepository branchRepository;
+    private final RefundRepository refundRepository;
+    private final UserRepository userRepository;
 
     @Override
     public StoreDashboardDto getStoreDashboard(Long storeId, String periodKey, String granularityKey) {
         if (storeId == null) {
             throw new BadRequestException("Store id is required");
         }
-        User currentUser = userService.getCurrentUser();
-        accessControlService.requireStoreAccess(currentUser, storeId);
+        accessControlService.requireStoreAccess(userService.getCurrentUser(), storeId);
 
+        Window window = resolveWindow(periodKey, granularityKey);
+        List<Branch> branches = branchRepository.findByStoreId(storeId);
+        List<Order> orders = orderRepository.findStoreOrdersInRange(
+                storeId, window.rangeStart, window.rangeEnd);
+        List<Order> previousOrders = orderRepository.findStoreOrdersInRange(
+                storeId, window.previousStart, window.rangeStart);
+
+        return buildDashboard(window, orders, previousOrders, branches, storeId, null);
+    }
+
+    @Override
+    public StoreDashboardDto getBranchDashboard(Long branchId, String periodKey, String granularityKey) {
+        if (branchId == null) {
+            throw new BadRequestException("Branch id is required");
+        }
+        accessControlService.requireBranchAccess(userService.getCurrentUser(), branchId);
+
+        Window window = resolveWindow(periodKey, granularityKey);
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new NotFoundException("Branch not found with id: " + branchId));
+        List<Order> orders = orderRepository.findBranchOrdersInRange(
+                branchId, window.rangeStart, window.rangeEnd);
+        List<Order> previousOrders = orderRepository.findBranchOrdersInRange(
+                branchId, window.previousStart, window.rangeStart);
+
+        StoreDashboardDto dto = buildDashboard(window, orders, previousOrders, List.of(branch), null, branchId);
+        enrichBranch(dto, branchId, window, orders);
+        return dto;
+    }
+
+    /** Resolves the requested window and the bucketing actually applied to it. */
+    private Window resolveWindow(String periodKey, String granularityKey) {
         LocalDate today = LocalDate.now();
         Period period = Period.resolve(periodKey);
         LocalDate start = period.start(today);
@@ -69,16 +106,32 @@ public class DashboardServiceImpl implements DashboardService {
         Granularity defaultGranularity = clamp(period.defaultGranularity, days);
         Granularity granularity = clamp(Granularity.resolve(granularityKey, defaultGranularity), days);
 
-        LocalDateTime rangeStart = start.atStartOfDay();
-        LocalDateTime rangeEnd = endExclusive.atStartOfDay();
-        LocalDateTime previousStart = start.minusDays(days).atStartOfDay();
+        return new Window(
+                period,
+                start,
+                endExclusive,
+                days,
+                granularity,
+                defaultGranularity,
+                buildLabels(start, endExclusive, granularity),
+                buildLabels(start, endExclusive, defaultGranularity),
+                start.atStartOfDay(),
+                endExclusive.atStartOfDay(),
+                start.minusDays(days).atStartOfDay());
+    }
 
-        List<Order> orders = orderRepository.findStoreOrdersInRange(storeId, rangeStart, rangeEnd);
-        List<Order> previousOrders = orderRepository.findStoreOrdersInRange(storeId, previousStart, rangeStart);
-        List<Branch> branches = branchRepository.findByStoreId(storeId);
+    private StoreDashboardDto buildDashboard(Window window, List<Order> orders, List<Order> previousOrders,
+            List<Branch> branches, Long storeId, Long branchId) {
+        Period period = window.period;
+        LocalDate start = window.start;
+        LocalDate endExclusive = window.endExclusive;
+        LocalDate today = window.endExclusive.minusDays(1);
+        Granularity granularity = window.granularity;
+        Granularity defaultGranularity = window.defaultGranularity;
+        List<String> labels = window.labels;
+        List<String> sparklineLabels = window.sparklineLabels;
 
         // ---- chart buckets (what the trend charts plot) ----
-        List<String> labels = buildLabels(start, endExclusive, granularity);
         double[] trendTotals = new double[labels.size()];
         Map<String, double[]> trendByBranch = new LinkedHashMap<>();
         for (Branch branch : branches) {
@@ -86,7 +139,6 @@ public class DashboardServiceImpl implements DashboardService {
         }
 
         // ---- sparkline buckets (metric cards; always the period's default bucketing) ----
-        List<String> sparklineLabels = buildLabels(start, endExclusive, defaultGranularity);
         double[] sparkSales = new double[sparklineLabels.size()];
         double[] sparkOrders = new double[sparklineLabels.size()];
         double[] sparkAov = new double[sparklineLabels.size()];
@@ -265,6 +317,7 @@ public class DashboardServiceImpl implements DashboardService {
 
         return StoreDashboardDto.builder()
                 .storeId(storeId)
+                .branchId(branchId)
                 .period(period.key)
                 .granularity(granularity.name())
                 .granularityOptions(optionsFor(defaultGranularity))
@@ -356,6 +409,60 @@ public class DashboardServiceImpl implements DashboardService {
         return defaultGranularity == Granularity.HOURLY
                 ? List.of("HOURLY", "DAILY")
                 : List.of("DAILY", "WEEKLY", "MONTHLY");
+    }
+
+    // ------------------------------------------------------------------
+    // Branch-only extras
+    // ------------------------------------------------------------------
+
+    /** Payment split, assigned staff and refunds inside the window. */
+    private void enrichBranch(StoreDashboardDto dto, Long branchId, Window window, List<Order> orders) {
+        Map<PaymentType, Double> byMethod = new EnumMap<>(PaymentType.class);
+        double gross = 0.0;
+        for (Order order : orders) {
+            PaymentType type = order.getPaymentType() != null ? order.getPaymentType() : PaymentType.CASH;
+            double amount = order.getTotalAmount() != null ? order.getTotalAmount() : 0.0;
+            byMethod.merge(type, amount, Double::sum);
+            gross += amount;
+        }
+        final double grossTotal = gross;
+        dto.setPaymentBreakdown(byMethod.entrySet().stream()
+                .sorted(Map.Entry.<PaymentType, Double>comparingByValue().reversed())
+                .map(entry -> PaymentSplitDto.builder()
+                        .method(entry.getKey().name())
+                        .amount(round2(entry.getValue()))
+                        .percentage(grossTotal > 0 ? round2(entry.getValue() / grossTotal * 100.0) : 0.0)
+                        .build())
+                .toList());
+
+        dto.setActiveStaff((long) userRepository.findByBranchId(branchId).size());
+
+        LocalDateTime from = window.rangeStart;
+        LocalDateTime to = window.rangeEnd;
+        List<Refund> refunds = refundRepository.findByBranchId(branchId).stream()
+                .filter(refund -> refund.getCreatedAt() != null
+                        && !refund.getCreatedAt().isBefore(from)
+                        && refund.getCreatedAt().isBefore(to))
+                .toList();
+        dto.setTotalRefunds((long) refunds.size());
+        dto.setRefundAmount(round2(refunds.stream()
+                .mapToDouble(refund -> refund.getAmount() != null ? refund.getAmount() : 0.0)
+                .sum()));
+    }
+
+    /** Resolved window plus the bucketing applied to it, shared by both dashboard scopes. */
+    private record Window(
+            Period period,
+            LocalDate start,
+            LocalDate endExclusive,
+            long days,
+            Granularity granularity,
+            Granularity defaultGranularity,
+            List<String> labels,
+            List<String> sparklineLabels,
+            LocalDateTime rangeStart,
+            LocalDateTime rangeEnd,
+            LocalDateTime previousStart) {
     }
 
     // ------------------------------------------------------------------

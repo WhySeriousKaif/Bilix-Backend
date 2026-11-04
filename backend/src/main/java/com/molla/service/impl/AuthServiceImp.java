@@ -1,165 +1,129 @@
 package com.molla.service.impl;
 
 import com.molla.domain.UserRole;
-import com.molla.exceptions.UserException;
+import com.molla.exceptions.BadRequestException;
+import com.molla.exceptions.NotFoundException;
 import com.molla.mapper.UserMapper;
 import com.molla.model.User;
-import com.molla.payload.dto.UserDto;
+import com.molla.payload.dto.LoginRequest;
+import com.molla.payload.dto.RegisterRequest;
 import com.molla.payload.response.AuthResponse;
 import com.molla.repository.UserRepository;
 import com.molla.service.AuthService;
 import com.molla.service.MailService;
-import com.molla.service.impl.CustomUserImplementation;
 import com.molla.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthServiceImp implements AuthService {
 
-    // Roles a user may assign to themselves via public self-registration.
-    // Anything else (admin, store admin, store manager, etc.) must be granted by an existing admin.
+    // Public signup represents a business owner creating a store-admin account.
+    // Employee roles are created later by an authorized manager.
     private static final Set<UserRole> SELF_REGISTERABLE_ROLES = Set.of(
-            UserRole.ROLE_CASHIER,
-            UserRole.ROLE_BRANCH_CASHIER,
-            UserRole.ROLE_BRANCH_MANAGER
-    );
+            UserRole.ROLE_STORE_ADMIN);
 
     private final UserRepository userRepository;
-
-    private  final PasswordEncoder passwordEncoder;
-
+    private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final AuthenticationManager authenticationManager;
 
-    private  final CustomUserImplementation customUserImplementation;
-
-    // Optional email service (only active when spring.mail.host is configured)
+    // Optional because email is not configured in every environment.
     @Autowired(required = false)
     private MailService mailService;
 
-
-
-
     @Override
-    public AuthResponse signUp(UserDto user) throws UserException {
-        User existingUser = userRepository.findByEmail(user.getEmail());
-        if (existingUser != null) {
-            throw new UserException("User already exists");
-        }
-        if (!SELF_REGISTERABLE_ROLES.contains(user.getRole())) {
-            throw new UserException("Cannot self-register with role: " + user.getRole());
+    @Transactional
+    @CacheEvict(cacheNames = { "users", "usersAll" }, allEntries = true)
+    public AuthResponse register(RegisterRequest request) {
+        if (userRepository.findByEmail(request.getEmail()) != null) {
+            throw new BadRequestException("User already exists with email: " + request.getEmail());
         }
 
-        User newUser=new User();
-        newUser.setEmail(user.getEmail());
-        newUser.setPassword(passwordEncoder.encode(user.getPassword()));
-        newUser.setRole(user.getRole());
-        newUser.setFullName(user.getFullName());
-        newUser.setPhone(user.getPhone());
-        newUser.setLastLoginAt(LocalDateTime.now());
-
-        newUser.setCreatedAt(LocalDateTime.now());
-        newUser.setUpdatedAt(LocalDateTime.now());
-
-        userRepository.save(newUser);
-
-        // Send welcome email (best-effort – failures are ignored so signup still works)
-        if (mailService != null) {
-            try {
-                mailService.sendSimpleMail(
-                        newUser.getEmail(),
-                        "Welcome to Bilix POS",
-                        "Hi " + newUser.getFullName() + ",\n\n" +
-                                "Your account has been created successfully.\n\n" +
-                                "Role: " + newUser.getRole() + "\n\n" +
-                                "Regards,\nBilix POS System"
-                );
-            } catch (Exception e) {
-                // Log and continue (you can hook into a logger if needed)
-                System.out.println("Failed to send welcome email: " + e.getMessage());
-            }
+        if (!SELF_REGISTERABLE_ROLES.contains(request.getRole())) {
+            throw new BadRequestException("Cannot self-register with role: " + request.getRole());
         }
 
-        Authentication authentication=
-                new UsernamePasswordAuthenticationToken(user.getEmail(),user.getPassword());
+        LocalDateTime now = LocalDateTime.now();
 
-        SecurityContextHolder.getContext()
-                .setAuthentication(authentication);
+        User newUser = new User();
+        newUser.setEmail(request.getEmail());
+        newUser.setPassword(passwordEncoder.encode(request.getPassword()));
+        newUser.setRole(request.getRole());
+        newUser.setFullName(request.getFullName());
+        newUser.setPhone(request.getPhone());
+        newUser.setLastLoginAt(now);
+        newUser.setCreatedAt(now);
+        newUser.setUpdatedAt(now);
 
-        String jwt=jwtUtil.generateToken(newUser.getEmail(), newUser.getRole().name());
+        User savedUser = userRepository.save(newUser);
 
-        AuthResponse authResponse=new AuthResponse();
-        authResponse.setJwt(jwt);
-        authResponse.setMessage("User registered successfully");
-        authResponse.setUser(UserMapper.toDto(newUser));
+        sendWelcomeEmail(savedUser);
 
-
-
-
-
-        return authResponse;
+        String jwt = jwtUtil.generateToken(savedUser.getEmail(), savedUser.getRole().name());
+        return buildResponse(savedUser, jwt, "User registered successfully");
     }
 
     @Override
-    public AuthResponse login(UserDto user) throws UserException {
-        String email=user.getEmail();
-        String password=user.getPassword();
-        Authentication authentication=authenticate(email,password);
-        
-        // Check if authentication failed
-        if (authentication == null) {
-            throw new UserException("Invalid email or password");
-        }
-        
-        User foundUser=userRepository.findByEmail(email);
-        
-        if (foundUser == null) {
-            throw new UserException("User not found");
-        }
-        
-        String jwt=jwtUtil.generateToken(foundUser.getEmail(), foundUser.getRole().name());
-
-        foundUser.setLastLoginAt(LocalDateTime.now());
-
-        userRepository.save(foundUser);
-
-        AuthResponse authResponse=new AuthResponse();
-        authResponse.setJwt(jwt);
-        authResponse.setMessage("Login successfully");
-        authResponse.setUser(UserMapper.toDto(foundUser));
-
-        return authResponse;
-    }
-
-    private  Authentication authenticate(String email,String password){
+    @Transactional
+    public AuthResponse login(LoginRequest request) {
         try {
-        UserDetails userDetails=customUserImplementation.loadUserByUsername(email);
-        if(!userDetails.getUsername().equals(email)){
-            return  null;
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        } catch (AuthenticationException exception) {
+            throw new BadRequestException("Invalid email or password");
         }
 
-        if(passwordEncoder.matches(password,userDetails.getPassword())){
-            return  new UsernamePasswordAuthenticationToken(
-                    userDetails.getUsername(),
-                    userDetails.getPassword(),
-                    userDetails.getAuthorities()
-            );
-        }
-        } catch (org.springframework.security.core.userdetails.UsernameNotFoundException e) {
-            // User not found - return null to indicate authentication failed
-            return null;
+        User user = userRepository.findByEmail(request.getEmail());
+        if (user == null) {
+            // Authentication normally guarantees that the user exists.
+            throw new NotFoundException("User not found: " + request.getEmail());
         }
 
-        return  null;
+        user.setLastLoginAt(LocalDateTime.now());
+        User savedUser = userRepository.save(user);
+
+        String jwt = jwtUtil.generateToken(savedUser.getEmail(), savedUser.getRole().name());
+        return buildResponse(savedUser, jwt, "Login successfully");
+    }
+
+    private void sendWelcomeEmail(User user) {
+        if (mailService == null) {
+            return;
+        }
+
+        try {
+            mailService.sendSimpleMail(
+                    user.getEmail(),
+                    "Welcome to Bilix POS",
+                    "Hi " + user.getFullName() + ",\n\n"
+                            + "Your account has been created successfully.\n\n"
+                            + "Role: " + user.getRole() + "\n\n"
+                            + "Regards,\nBilix POS System");
+        } catch (Exception exception) {
+            // Email is best-effort; account creation remains successful.
+            log.warn("Failed to send welcome email to {}: {}", user.getEmail(), exception.getMessage());
+        }
+    }
+
+    private AuthResponse buildResponse(User user, String jwt, String message) {
+        AuthResponse response = new AuthResponse();
+        response.setJwt(jwt);
+        response.setMessage(message);
+        response.setUser(UserMapper.toDto(user));
+        return response;
     }
 }

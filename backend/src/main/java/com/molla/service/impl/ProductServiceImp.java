@@ -5,7 +5,6 @@ import com.molla.exceptions.NotFoundException;
 import com.molla.model.Category;
 import com.molla.model.Product;
 import com.molla.model.Store;
-import com.molla.model.User;
 import com.molla.mapper.ProductMapper;
 import com.molla.payload.dto.ProductDto;
 import com.molla.repository.CategoryRepository;
@@ -34,7 +33,7 @@ public class ProductServiceImp implements ProductService {
 
     @Override
     @CacheEvict(cacheNames = { "productsByStore", "productsAll", "categoriesByStore" }, allEntries = true)
-    public ProductDto createProduct(ProductDto productDto, User user) {
+    public ProductDto createProduct(ProductDto productDto) {
         if (productDto.getStoreId() == null) {
             throw new BadRequestException("You need to create a store before adding products.");
         }
@@ -74,7 +73,7 @@ public class ProductServiceImp implements ProductService {
 
     @Override
     @CacheEvict(cacheNames = { "productsByStore", "productsAll", "categoriesByStore" }, allEntries = true)
-    public ProductDto updateProduct(Long id, ProductDto productDto, User user) {
+    public ProductDto updateProduct(Long id, ProductDto productDto) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Product not found with id: " + id));
 
@@ -113,7 +112,7 @@ public class ProductServiceImp implements ProductService {
 
     @Override
     @CacheEvict(cacheNames = { "productsByStore", "productsAll", "categoriesByStore" }, allEntries = true)
-    public void deleteProduct(Long id, User user) {
+    public void deleteProduct(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Product not found with id: " + id));
         productRepository.delete(product);
@@ -146,6 +145,7 @@ public class ProductServiceImp implements ProductService {
 
     @Override
     public List<ProductDto> searchByKeyword(Long storeId, String keyword) {
+        accessControlService.requireStoreAccess(userService.getCurrentUser(), storeId);
         List<Product> products = productRepository.searchByKeyword(storeId, keyword);
         return products.stream().map(ProductMapper::toDto).collect(Collectors.toList());
     }

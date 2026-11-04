@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 /**
  * Everything the store-admin dashboard renders, computed from real order/branch/product
  * rows for a single requested period. Nothing here is hardcoded — every number is derived
- * from the orders belonging to the requested store.
+ * from the orders belonging to the requested store (or, for the branch view, one branch).
  */
 @Data
 @Builder
@@ -20,6 +20,8 @@ import lombok.NoArgsConstructor;
 public class StoreDashboardDto {
 
     private Long storeId;
+    /** Set only by the branch-scoped endpoint; null for the store view. */
+    private Long branchId;
     /** Requested period key: TODAY | 7D | 30D | 3M | 1Y */
     private String period;
     /** Bucketing actually applied after clamping: HOURLY | DAILY | WEEKLY | MONTHLY */
@@ -49,6 +51,12 @@ public class StoreDashboardDto {
     private List<RecentSaleDto> recentSales;
     private List<TopProductDto> topProducts;
     private List<OrderStatusDto> orderStatus;
+
+    /* ---- branch-scoped extras (null for the store view) ---- */
+    private List<PaymentSplitDto> paymentBreakdown;
+    private Long activeStaff;
+    private Long totalRefunds;
+    private Double refundAmount;
 
     @Data
     @Builder
@@ -139,6 +147,16 @@ public class StoreDashboardDto {
         private String status;
         private String label;
         private Long count;
+        private Double percentage;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PaymentSplitDto {
+        private String method;
+        private Double amount;
         private Double percentage;
     }
 }

@@ -32,11 +32,16 @@ public class AccessControlService {
         }
 
         Branch branch = branchRepository.findById(branchId)
-                .orElseThrow(() -> new NotFoundException("Branch not found with id: " + branchId));
+                .orElseThrow(
+                        () -> new NotFoundException("Branch not found with id: " + branchId)
+                );
 
-        if (user.getRole() == UserRole.ROLE_STORE_ADMIN || user.getRole() == UserRole.ROLE_STORE_MANAGER) {
+        if (user.getRole() == UserRole.ROLE_STORE_ADMIN ||
+                user.getRole() == UserRole.ROLE_STORE_MANAGER) {
+
             Long userStoreId = user.getStore() != null ? user.getStore().getId() : null;
             Long branchStoreId = branch.getStore() != null ? branch.getStore().getId() : null;
+
             if (userStoreId != null && userStoreId.equals(branchStoreId)) {
                 return;
             }
@@ -60,11 +65,14 @@ public class AccessControlService {
             return;
         }
 
-        Long userStoreId = user.getStore() != null
-                ? user.getStore().getId()
-                : (user.getBranch() != null && user.getBranch().getStore() != null
-                        ? user.getBranch().getStore().getId()
-                        : null);
+        Long userStoreId = null;
+
+        if (user.getStore() != null) {
+            userStoreId = user.getStore().getId();
+        }
+        else if (user.getBranch() != null && user.getBranch().getStore() != null) {
+            userStoreId = user.getBranch().getStore().getId();
+        }
 
         if (userStoreId != null && userStoreId.equals(storeId)) {
             return;
@@ -82,19 +90,25 @@ public class AccessControlService {
         if (user.getRole() == UserRole.ROLE_ADMIN) {
             return;
         }
-        if (user.getRole() == UserRole.ROLE_STORE_ADMIN || user.getRole() == UserRole.ROLE_STORE_MANAGER) {
+        if (user.getRole() == UserRole.ROLE_STORE_ADMIN ||
+                user.getRole() == UserRole.ROLE_STORE_MANAGER) {
+
             Long userStoreId = user.getStore() != null ? user.getStore().getId() : null;
             Long branchStoreId = branch != null && branch.getStore() != null ? branch.getStore().getId() : null;
+
             if (userStoreId != null && userStoreId.equals(branchStoreId)) {
                 return;
             }
             throw new BadRequestException("You do not have management access to this branch");
         }
         if (user.getRole() == UserRole.ROLE_BRANCH_MANAGER) {
+
             Long userBranchId = user.getBranch() != null ? user.getBranch().getId() : null;
+
             if (userBranchId != null && branch != null && userBranchId.equals(branch.getId())) {
                 return;
             }
+
             throw new BadRequestException("You do not have management access to this branch");
         }
         throw new BadRequestException("Only a Store Admin, Store Manager, Branch Manager, or Super Admin can manage employees");
@@ -107,9 +121,11 @@ public class AccessControlService {
      * or managing employees still requires requireManagerAccessToBranch.
      */
     public void requireBranchInfoEditAccess(User user, Branch branch) {
+
         if (user.getRole() == UserRole.ROLE_ADMIN) {
             return;
         }
+
         if (user.getRole() == UserRole.ROLE_STORE_ADMIN || user.getRole() == UserRole.ROLE_STORE_MANAGER) {
             Long userStoreId = user.getStore() != null ? user.getStore().getId() : null;
             Long branchStoreId = branch != null && branch.getStore() != null ? branch.getStore().getId() : null;
@@ -118,10 +134,18 @@ public class AccessControlService {
             }
             throw new BadRequestException("You do not have access to this branch");
         }
+
+        if (user.getRole() != UserRole.ROLE_BRANCH_MANAGER &&
+                user.getRole() != UserRole.ROLE_BRANCH_CASHIER &&
+                user.getRole() != UserRole.ROLE_CASHIER) {
+            throw new BadRequestException("This role cannot edit branch information");
+        }
         Long userBranchId = user.getBranch() != null ? user.getBranch().getId() : null;
+
         if (userBranchId != null && branch != null && userBranchId.equals(branch.getId())) {
             return;
         }
+
         throw new BadRequestException("You do not have access to this branch");
     }
 
@@ -132,9 +156,11 @@ public class AccessControlService {
         }
         if (user.getRole() == UserRole.ROLE_STORE_ADMIN || user.getRole() == UserRole.ROLE_STORE_MANAGER) {
             Long userStoreId = user.getStore() != null ? user.getStore().getId() : null;
+
             if (userStoreId != null && userStoreId.equals(storeId)) {
                 return;
             }
+
             throw new BadRequestException("You do not have management access to this store");
         }
         throw new BadRequestException("Only a Store Admin, Store Manager, or Super Admin can manage employees at the store level");
@@ -148,7 +174,9 @@ public class AccessControlService {
     }
 
     /** For endpoints scoped to "my own data" (e.g. a cashier's own shift/orders). */
+
     public void requireSelfOrAdmin(User user, Long targetUserId) {
+
         if (user.getRole() == UserRole.ROLE_ADMIN) {
             return;
         }
@@ -156,5 +184,29 @@ public class AccessControlService {
             return;
         }
         throw new BadRequestException("You do not have access to this resource");
+    }
+
+    /** Prevents IDOR when a user id is supplied by a client or service call. */
+    public void requireUserAccess(User currentUser, User targetUser) {
+        if (currentUser == null || targetUser == null || currentUser.getRole() == null) {
+            throw new BadRequestException("Authenticated user is required");
+        }
+        if (currentUser.getRole() == UserRole.ROLE_ADMIN ||
+                (currentUser.getId() != null && currentUser.getId().equals(targetUser.getId()))) {
+            return;
+        }
+        if (currentUser.getStore() != null && targetUser.getStore() != null &&
+                currentUser.getStore().getId().equals(targetUser.getStore().getId()) &&
+                (currentUser.getRole() == UserRole.ROLE_STORE_ADMIN || currentUser.getRole() == UserRole.ROLE_STORE_MANAGER)) {
+            return;
+        }
+        if (currentUser.getBranch() != null && targetUser.getBranch() != null &&
+                currentUser.getBranch().getId().equals(targetUser.getBranch().getId()) &&
+                (currentUser.getRole() == UserRole.ROLE_BRANCH_MANAGER ||
+                        currentUser.getRole() == UserRole.ROLE_BRANCH_CASHIER ||
+                        currentUser.getRole() == UserRole.ROLE_CASHIER)) {
+            return;
+        }
+        throw new BadRequestException("You do not have access to this user");
     }
 }

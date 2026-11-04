@@ -26,57 +26,37 @@ public class ProductController {
     @PostMapping
     public ResponseEntity<ProductDto> createProduct(
             @RequestBody ProductDto productDto,
-            @RequestHeader(value = "Authorization", required = false) String jwt
+            @RequestHeader("Authorization") String jwt
     ) throws UserException {
 
-        User user = null;
-
-        if (jwt != null && !jwt.isEmpty()) {
-            try {
-                user = userService.getUserFromJwt(jwt);
-            } catch (Exception e) {
-                // Invalid JWT → continue for testing
-            }
-        }
+        User user = userService.getUserFromJwt(jwt);
 
         // Auto-set storeId from logged-in user if not provided
         if (user != null && user.getStore() != null && productDto.getStoreId() == null) {
             productDto.setStoreId(user.getStore().getId());
         }
 
-        ProductDto createdProduct = productService.createProduct(productDto, user);
-        return ResponseEntity.ok(createdProduct);
+        return ResponseEntity.ok(productService.createProduct(productDto));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ProductDto> updateProduct(
             @PathVariable Long id,
-            @RequestBody ProductDto productDto,
-            @RequestHeader("Authorization") String jwt
-    ) throws UserException {
-
-        User user = userService.getUserFromJwt(jwt);
-        return ResponseEntity.ok(productService.updateProduct(id, productDto, user));
+            @RequestBody ProductDto productDto) {
+        return ResponseEntity.ok(productService.updateProduct(id, productDto));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse> deleteProduct(
-            @PathVariable Long id,
-            @RequestHeader("Authorization") String jwt
-    ) throws UserException {
-
-        User user = userService.getUserFromJwt(jwt);
-        productService.deleteProduct(id, user);
+            @PathVariable Long id) {
+        productService.deleteProduct(id);
 
         return ResponseEntity.ok(new ApiResponse("Product deleted successfully"));
     }
 
     @GetMapping("/storeId/{storeId}")
     public ResponseEntity<List<ProductDto>> getProductsByStoreId(
-            @PathVariable Long storeId,
-            @RequestHeader("Authorization") String jwt
-    ) throws UserException {
-
+            @PathVariable Long storeId) {
         return ResponseEntity.ok(productService.getProductsById(storeId));
     }
 
@@ -84,37 +64,27 @@ public class ProductController {
     public ResponseEntity<Page<ProductDto>> getProductsPaged(
             @PathVariable Long storeId,
             @PageableDefault(size = 10, sort = "createdAt") Pageable pageable,
-            @RequestParam(required = false) String search,
-            @RequestHeader(value = "Authorization", required = false) String jwt
-    ) throws UserException {
+            @RequestParam(required = false) String search) {
         return ResponseEntity.ok(productService.getProductsPaged(storeId, search, pageable));
     }
 
     @GetMapping("/search/{storeId}/{keyword}")
     public ResponseEntity<List<ProductDto>> searchByKeyword(
             @PathVariable Long storeId,
-            @PathVariable String keyword,
-            @RequestHeader("Authorization") String jwt
-    ) throws UserException {
-
+            @PathVariable String keyword) {
         return ResponseEntity.ok(productService.searchByKeyword(storeId, keyword));
     }
 
     @GetMapping("/all")
     public ResponseEntity<List<ProductDto>> getAllProducts(
-            @RequestHeader(value = "Authorization", required = false) String jwt
+            @RequestHeader("Authorization") String jwt
     ) throws UserException {
 
-        Long storeId = 1L;
-
-        if (jwt != null && !jwt.isEmpty()) {
-            try {
-                User user = userService.getUserFromJwt(jwt);
-                storeId = user.getStore().getId();
-            } catch (Exception e) {
-                storeId = 1L;
-            }
+        User user = userService.getUserFromJwt(jwt);
+        if (user.getStore() == null) {
+            throw new org.springframework.security.access.AccessDeniedException("No store is assigned to this account");
         }
+        Long storeId = user.getStore().getId();
 
         return ResponseEntity.ok(productService.getAllProducts(storeId));
     }

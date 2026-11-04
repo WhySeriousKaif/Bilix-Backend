@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,8 +31,10 @@ public class StoreServiceImp implements StoreService {
     private final StoreRepository storeRepository;
     private final UserService userService;
     private final EmployeeService employeeService;
+    private final AccessControlService accessControlService;
 
     @Override
+    @Transactional
     @CacheEvict(cacheNames = { "stores", "storesAll", "storesByAdmin" }, allEntries = true)
     public StoreDto createStore(StoreDto storeDto, User user) {
         // 🔐 Authorization: Only a Store Admin may create/register their own store
@@ -56,16 +59,18 @@ public class StoreServiceImp implements StoreService {
     }
 
     @Override
-    @Cacheable(cacheNames = "stores", key = "#id")
     public StoreDto getStoreById(Long id) {
+        // This check must run on every request. A shared cache keyed only by store ID
+        // could otherwise return a DTO without re-checking the current caller.
+        accessControlService.requireStoreAccess(userService.getCurrentUser(), id);
         Store store = storeRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Store not found with id: " + id));
         return StoreMapper.toDTO(store);
     }
 
     @Override
-    @Cacheable(cacheNames = "storesAll")
     public List<StoreDto> getAllStores() {
+        accessControlService.requireAdmin(userService.getCurrentUser());
         List<Store> dtos = storeRepository.findAll();
         return dtos.stream().map(StoreMapper::toDTO).collect(Collectors.toList());
 
@@ -100,9 +105,11 @@ public class StoreServiceImp implements StoreService {
         // update their own store
         if (currentUser.getRole().equals(UserRole.ROLE_ADMIN)) {
             // Super admin: allow updating any store
+
         } else if (currentUser.getRole().equals(UserRole.ROLE_STORE_ADMIN)) {
             // Store admin: only allow updating their own store
             Store userStore = storeRepository.findByStoreAdminId(currentUser.getId());
+
             if (userStore == null || !userStore.getId().equals(id)) {
                 throw new BadRequestException("You can only update your own store");
             }
@@ -110,8 +117,15 @@ public class StoreServiceImp implements StoreService {
             throw new BadRequestException("Only Super Admin or Store Admin can update stores");
         }
 
-        existingStore.setBrand(storeDto.getBrand());
-        existingStore.setDescription(storeDto.getDescription());
+        if (storeDto.getBrand() != null) {
+            if (storeDto.getBrand().isBlank()) {
+                throw new BadRequestException("Store brand is required");
+            }
+            existingStore.setBrand(storeDto.getBrand());
+        }
+        if (storeDto.getDescription() != null) {
+            existingStore.setDescription(storeDto.getDescription());
+        }
         if (storeDto.getStoreType() != null) {
             existingStore.setStoreType(storeDto.getStoreType());
         }
@@ -139,7 +153,7 @@ public class StoreServiceImp implements StoreService {
     }
 
     @Override
-    public StoreDto getStoreByEmployee(String brand) {
+    public StoreDto getStoreByEmployee() {
         User currentUser = userService.getCurrentUser();
         if (currentUser == null) {
             throw new BadRequestException("You don't have permission to access this store");

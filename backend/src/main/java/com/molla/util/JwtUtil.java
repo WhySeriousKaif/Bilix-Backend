@@ -7,9 +7,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 🔑 JWT Utility - Handles JWT token generation and validation
@@ -38,7 +39,7 @@ public class JwtUtil {
      */
     public JwtUtil(@Value("${jwt.secret}") String secret) {
         // 🔑 Create HMAC-SHA256 secret key from string
-        this.key = Keys.hmacShaKeyFor(secret.getBytes());
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -75,12 +76,9 @@ getSubject() → email
      */
     public String generateToken(String email, String role) {
         // 📝 Create claims map (custom data in token)
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("role", role);
-
         // 🔨 Build JWT token using jjwt library
         return Jwts.builder()
-                .setClaims(claims)  // Add custom claims (role)
+                .setClaims(Map.of("role", role))  // Add custom claims (role)
                 .setSubject(email)  // Set subject (email - identifies user)
                 .setIssuedAt(new Date())  // Token creation time
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))  // 24 hours expiry
@@ -136,21 +134,13 @@ getSubject() → email
      */
     public boolean validateToken(String token, String email) {
         try {
-            return extractEmail(token).equals(email) && !isExpired(token);
+            Claims claims = extractAllClaims(token);
+            return Objects.equals(claims.getSubject(), email)
+                    && claims.getExpiration().after(new Date());
         } catch (Exception e) {
             // ⚠️ Any parsing error = invalid token
             return false;
         }
-    }
-
-    /**
-     * ⏰ Check if Token is Expired
-     * 
-     * 👉 Purpose: Verify token hasn't passed expiration time
-     * 🔹 Why: Expired tokens should be rejected (security)
-     */
-    private boolean isExpired(String token) {
-        return extractAllClaims(token).getExpiration().before(new Date());
     }
 
     /**

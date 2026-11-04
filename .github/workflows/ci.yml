@@ -20,6 +20,13 @@ jobs:
       - run: mvn -q test
         env:
           JWT_SECRET: test-only-secret-key-that-is-long-enough-for-hmac
+          RAZORPAY_API_KEY: test-key
+          RAZORPAY_API_SECRET: test-secret
+          STRIPE_PUBLIC_KEY: test-public-key
+          STRIPE_SECRET_KEY: test-secret-key
+          CLOUDINARY_CLOUD_NAME: test-cloud
+          CLOUDINARY_API_KEY: test-key
+          CLOUDINARY_API_SECRET: test-secret
 
   frontend:
     runs-on: ubuntu-latest
@@ -33,7 +40,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: pos-frontend/package-lock.json
       - run: npm ci
       - run: npm run build

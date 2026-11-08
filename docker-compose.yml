@@ -18,17 +18,38 @@ services:
   backend:
     build: ./backend
     environment:
+      SPRING_PROFILES_ACTIVE: redis,kafka
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
       JWT_SECRET: ${JWT_SECRET:-local-development-jwt-secret-change-me}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
       SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-bilix}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-bilix}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-bilix-local-password}
       SPRING_DATASOURCE_DRIVER: org.postgresql.Driver
       SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
+
+      RAZORPAY_API_KEY: ${RAZORPAY_API_KEY:-test-key}
+      RAZORPAY_API_SECRET: ${RAZORPAY_API_SECRET:-test-secret}
+      STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:-test-public-key}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-test-secret-key}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-test-cloud}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-test-key}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-test-secret}
+
     ports:
       - "5001:5001"
+
+    
     depends_on:
       database:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
 
   frontend:
     build:
@@ -40,6 +61,31 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+  
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  kafka:
+    image: bitnami/kafka:3.7
+    ports: 
+     - "9092:9092"
+    environment:
+     KAFKA_CFG_NODE_ID: 1
+     KAFKA_CFG_PROCESS_ROLES: broker,controller
+     KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+     KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+     KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+     KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+     KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+     KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "false"
+     ALLOW_PLAINTEXT_LISTENER: "yes"
+
 
 volumes:
   postgres-data:

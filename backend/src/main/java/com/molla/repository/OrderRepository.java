@@ -23,6 +23,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("select o from Order o where o.id = :id")
     Optional<Order> findByIdForUpdate(@Param("id") Long id);
 
+
+    Optional<Order> findByIdempotencyKey(String idempotencyKey);
+
     List<Order> findByCustomerId(Long customerId);
     boolean existsByCustomerIdAndBranchId(Long customerId, Long branchId);
     List<Order> findByBranchId(Long branchId);
@@ -135,7 +138,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     long countByCreatedAtBetween(LocalDateTime startDate, LocalDateTime endDate);
 
-    @Query("SELECT o.createdAt, o.totalAmount FROM Order o WHERE o.createdAt >= :startDate AND o.createdAt < :endDate")
+    @Query("SELECT o.createdAt, o.totalAmount " +
+            "FROM Order o WHERE o.createdAt >= :startDate AND o.createdAt < :endDate")
     List<Object[]> findSalesRowsBetween(
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);

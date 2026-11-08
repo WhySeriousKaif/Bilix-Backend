@@ -21,8 +21,8 @@ public class OrderController {
     private final OrderService orderService;
 
     @PostMapping
-    public ResponseEntity<OrderDto> createOrder(@RequestBody OrderDto orderDto) throws Exception {
-        return ResponseEntity.ok(orderService.createOrder(orderDto));
+    public ResponseEntity<OrderDto> createOrder(@RequestHeader("idempotency-Key")String idempotencyKey,@RequestBody OrderDto orderDto) throws Exception {
+        return ResponseEntity.ok(orderService.createOrder(orderDto,idempotencyKey));
     }
 
     @PutMapping("/{id}")

@@ -34,12 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
-import java.util.Set;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -57,7 +53,17 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     @CacheEvict(cacheNames = { "productsByStore", "productsAll", "orders", "recentOrdersByBranch" }, allEntries = true)
-    public OrderDto createOrder(OrderDto orderDto) throws Exception {
+    public OrderDto createOrder(OrderDto orderDto,String idempotencyKey) throws Exception {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new BadRequestException("Idempotency-Key header is required");
+
+        }
+        Optional<Order>existingOrder=orderRepository.findByIdempotencyKey(idempotencyKey);
+
+        if(existingOrder.isPresent()){
+            return OrderMapper.toDto(existingOrder.get());
+        }
+
         // The order is always attributed to whoever is actually authenticated —
         // never trust a branchId/cashierId supplied by the client for this.
         User cashier = userService.getCurrentUser();
@@ -81,6 +87,7 @@ public class OrderServiceImpl implements OrderService {
                 .customer(customer)
                 .paymentType(orderDto.getPaymentType())
                 .status(OrderStatus.COMPLETED)
+                .idempotencyKey(idempotencyKey)
                 .build();
 
         // Create order items

@@ -1,5 +1,6 @@
 package com.molla.service.impl;
 
+import com.molla.events.RefundProcessedEvent;
 import com.molla.mapper.RefundMapper;
 import com.molla.domain.OrderStatus;
 import com.molla.exceptions.BadRequestException;
@@ -21,6 +22,7 @@ import com.molla.repository.ShiftReportRepository;
 import com.molla.service.RefundService;
 import com.molla.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +44,8 @@ public class RefundServiceImpl implements RefundService {
     private final ShiftReportRepository shiftReportRepository;
     private final ProductRepository productRepository;
     private final AccessControlService accessControlService;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -166,7 +170,18 @@ public class RefundServiceImpl implements RefundService {
             .allMatch(item -> alreadyRefunded.getOrDefault(item.getId(), 0) >= item.getQuantity());
         order.setStatus(fullyRefunded ? OrderStatus.REFUNDED : OrderStatus.PARTIALLY_REFUNDED);
         orderRepository.save(order);
-        
+
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new RefundProcessedEvent(
+                    savedRefund.getId(),
+                    savedRefund.getOrder().getId(),
+                    savedRefund.getOrder().getId(),
+                    savedRefund.getCashier().getId(),
+                    savedRefund.getAmount(),
+                    savedRefund.getPaymentType().name(),
+                    savedRefund.getCreatedAt()
+            ));
+        }
         return RefundMapper.toDto(savedRefund);
     }
 

@@ -9,7 +9,7 @@ import org.springframework.data.domain.Page;
 import java.util.List;
 
 public interface OrderService {
-    OrderDto createOrder(OrderDto orderDto) throws Exception;
+    OrderDto createOrder(OrderDto orderDto,String idempotencyKey) throws Exception;
     OrderDto updateOrder(Long id, OrderDto orderDto) throws Exception;
     void deleteOrder(Long id) throws Exception;
     OrderDto getOrderById(Long id) throws Exception;

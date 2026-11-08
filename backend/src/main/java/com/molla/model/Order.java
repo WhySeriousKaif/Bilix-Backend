@@ -16,7 +16,25 @@ import java.util.List;
 @RequiredArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "orders")
+@Table(name = "orders",
+        indexes={
+        @Index(
+                name="idx_order_branch_created",
+                columnList = "branch_id,created_at"
+        ), @Index(
+                name="idx_order_customer",
+                columnList = "customer_id"
+
+        ), @Index(
+                name = "idx_order_cashier_created",
+                columnList = "cashier_id, created_at"
+        ), @Index(
+                name = "idx_order_status",
+                columnList = "status"
+        )
+
+        })
+
 public class Order {
 
     @Id
@@ -44,6 +62,14 @@ public class Order {
     
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
+
+    @Column(
+            name="idempotency_key",
+            unique = true,
+            length = 100
+
+    )
+    private String idempotencyKey;
     
     @PrePersist
     protected void onCreate(){

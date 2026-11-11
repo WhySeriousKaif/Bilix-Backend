@@ -1,4 +1,4 @@
-package com.molla.payload.ai;
+package com.molla.payload.dto.ai;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

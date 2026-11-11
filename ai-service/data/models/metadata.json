@@ -1,0 +1,20 @@
+{
+  "model_name": "billix-basket-recommender",
+  "model_version": "1.0.0",
+  "algorithm": "FP-Growth association rules",
+  "trained_at": "2026-11-09T15:04:14.647725+00:00",
+  "training_data": "data/processed/transaction_items.csv",
+  "transaction_count": 514,
+  "item_row_count": 1029,
+  "product_count": 11,
+  "rule_count": 10,
+  "parameters": {
+    "min_support": 0.05,
+    "min_confidence": 0.2,
+    "min_lift": 1.0
+  },
+  "artifacts": {
+    "popularity": "popularity.joblib",
+    "association_rules": "association_rules.joblib"
+  }
+}

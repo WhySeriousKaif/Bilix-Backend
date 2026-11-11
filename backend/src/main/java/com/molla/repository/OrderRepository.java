@@ -152,4 +152,25 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT o.branch.id, COALESCE(SUM(o.totalAmount), 0), COUNT(o) FROM Order o GROUP BY o.branch.id")
     List<Object[]> sumSalesByBranch();
+
+    @Query("""
+    SELECT DISTINCT o
+    FROM Order o
+    JOIN FETCH o.branch b
+    JOIN FETCH b.store s
+    JOIN FETCH o.orderItems oi
+    JOIN FETCH oi.product p
+    LEFT JOIN FETCH p.category c
+    WHERE s.id=:storeId
+    AND o.status=com.molla.domain.OrderStatus.COMPLETED
+    AND o.createdAt >= :from
+    AND o.createdAt < :to
+    ORDER BY o.createdAt ASC
+""")
+    List<Order>findCompletedOrdersForAiExport(
+            @Param("storeId") Long storeId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
 }
+

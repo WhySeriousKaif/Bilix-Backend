@@ -26,6 +26,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -33,6 +34,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 
 @Service
 @RequiredArgsConstructor
@@ -240,6 +243,7 @@ public class RefundServiceImpl implements RefundService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public org.springframework.data.domain.Page<RefundDto> getRefundByBranchPaged(
             Long branchId, org.springframework.data.domain.Pageable pageable) {
         return getRefundByBranchPaged(branchId, pageable, null, null, null);
@@ -264,8 +268,28 @@ public class RefundServiceImpl implements RefundService {
             try { numericId = Long.parseLong(term.replaceFirst("^#", "")); }
             catch (NumberFormatException ignored) { /* Reason search. */ }
         }
-        return refundRepository.findBranchRefundsFiltered(branchId, from, paymentType, term,
-                numericId, numericId, pageable).map(RefundMapper::toDto);
+        Long parsedId = numericId;
+        Specification<Refund> specification = (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(builder.equal(root.get("branch").get("id"), branchId));
+            if (from != null) predicates.add(builder.greaterThanOrEqualTo(root.get("createdAt"), from));
+            if (paymentType != null) predicates.add(builder.equal(root.get("paymentType"), paymentType));
+            if (term != null) {
+                String pattern = "%" + term.toLowerCase(java.util.Locale.ROOT) + "%";
+                Predicate reason = builder.like(builder.lower(root.get("reason")), pattern);
+                if (parsedId == null) {
+                    predicates.add(reason);
+                } else {
+                    var order = root.join("order", JoinType.LEFT);
+                    predicates.add(builder.or(
+                            builder.equal(root.get("id"), parsedId),
+                            builder.equal(order.get("id"), parsedId),
+                            reason));
+                }
+            }
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+        return refundRepository.findAll(specification, pageable).map(RefundMapper::toDto);
     }
 
     @Override

@@ -29,6 +29,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +37,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 
 @Service
 @RequiredArgsConstructor
@@ -268,6 +271,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<OrderDto> getOrdersByBranchPaged(Long branchId, int page, int size, String sortBy, String direction,
             String search, String status, String payment, String period) throws Exception {
         accessControlService.requireBranchAccess(userService.getCurrentUser(), branchId);
@@ -304,8 +308,25 @@ public class OrderServiceImpl implements OrderService {
             try { orderId = Long.parseLong(term.replaceFirst("^#", "")); }
             catch (NumberFormatException ignored) { /* Name search. */ }
         }
-        Page<Order> pageResult = orderRepository.findBranchOrdersFiltered(
-                branchId, from, orderStatus, paymentType, term, orderId, pageable);
+        Long parsedOrderId = orderId;
+        Specification<Order> specification = (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(builder.equal(root.get("branch").get("id"), branchId));
+            if (from != null) predicates.add(builder.greaterThanOrEqualTo(root.get("createdAt"), from));
+            if (orderStatus != null) predicates.add(builder.equal(root.get("status"), orderStatus));
+            if (paymentType != null) predicates.add(builder.equal(root.get("paymentType"), paymentType));
+            if (term != null) {
+                var customer = root.join("customer", JoinType.LEFT);
+                Predicate customerName = builder.like(
+                        builder.lower(customer.get("name")),
+                        "%" + term.toLowerCase(Locale.ROOT) + "%");
+                predicates.add(parsedOrderId == null
+                        ? customerName
+                        : builder.or(builder.equal(root.get("id"), parsedOrderId), customerName));
+            }
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+        Page<Order> pageResult = orderRepository.findAll(specification, pageable);
         return pageResult.map(OrderMapper::toDto);
     }
 
@@ -322,8 +343,25 @@ public class OrderServiceImpl implements OrderService {
                 ? Sort.by(sortBy).ascending()
                 : Sort.by(sortBy).descending();
         String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
-        return orderRepository.findSystemSalesFiltered(
-                normalizedSearch, status, storeId, PageRequest.of(page, size, sort))
+        Specification<Order> specification = (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            var branch = root.join("branch", JoinType.LEFT);
+            var store = branch.join("store", JoinType.LEFT);
+            if (status != null) predicates.add(builder.equal(root.get("status"), status));
+            if (storeId != null) predicates.add(builder.equal(store.get("id"), storeId));
+            if (normalizedSearch != null) {
+                String pattern = "%" + normalizedSearch.toLowerCase(Locale.ROOT) + "%";
+                var customer = root.join("customer", JoinType.LEFT);
+                var cashier = root.join("cashier", JoinType.LEFT);
+                predicates.add(builder.or(
+                        builder.like(builder.lower(customer.get("name")), pattern),
+                        builder.like(builder.lower(cashier.get("fullName")), pattern),
+                        builder.like(builder.lower(cashier.get("email")), pattern),
+                        builder.like(builder.lower(store.get("brand")), pattern)));
+            }
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+        return orderRepository.findAll(specification, PageRequest.of(page, size, sort))
                 .map(OrderMapper::toDto);
     }
 

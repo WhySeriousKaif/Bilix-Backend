@@ -26,6 +26,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -151,7 +156,22 @@ public class ProductServiceImp implements ProductService {
     public Page<ProductDto> getProductsPaged(Long storeId, String search, Pageable pageable) {
         accessControlService.requireStoreAccess(userService.getCurrentUser(), storeId);
         String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
-        return productRepository.findByStoreIdFiltered(storeId, normalizedSearch, pageable)
+        Specification<Product> specification = (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(builder.equal(root.get("store").get("id"), storeId));
+            if (normalizedSearch != null) {
+                String pattern = "%" + normalizedSearch.toLowerCase(Locale.ROOT) + "%";
+                var category = root.join("category", JoinType.LEFT);
+                predicates.add(builder.or(
+                        builder.like(builder.lower(root.get("name")), pattern),
+                        builder.like(builder.lower(root.get("brand")), pattern),
+                        builder.like(builder.lower(root.get("sku")), pattern),
+                        builder.like(builder.lower(root.get("description")), pattern),
+                        builder.like(builder.lower(category.get("name")), pattern)));
+            }
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+        return productRepository.findAll(specification, pageable)
                 .map(ProductMapper::toDto);
     }
 

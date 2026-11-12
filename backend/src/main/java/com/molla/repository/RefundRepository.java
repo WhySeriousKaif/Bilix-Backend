@@ -3,6 +3,7 @@ package com.molla.repository;
 import com.molla.model.Refund;
 import com.molla.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,7 +13,7 @@ import com.molla.domain.PaymentType;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public interface RefundRepository extends JpaRepository<Refund, Long> {
+public interface RefundRepository extends JpaRepository<Refund, Long>, JpaSpecificationExecutor<Refund> {
     
     List<Refund> findByCashierAndCreatedAtBetween(User cashier, LocalDateTime startDate, LocalDateTime endDate);
     

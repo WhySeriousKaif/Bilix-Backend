@@ -77,8 +77,22 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<BranchCustomerDto> findBranchCustomers(@Param("branchId") Long branchId,
             @Param("search") String search, Pageable pageable);
 
-    @Query("""
+    @Query(value = """
             SELECT o FROM Order o
+            LEFT JOIN o.customer customer
+            LEFT JOIN o.cashier cashier
+            LEFT JOIN o.branch branch
+            LEFT JOIN branch.store store
+            WHERE (:search IS NULL
+                OR LOWER(customer.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(cashier.fullName) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(cashier.email) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(store.brand) LIKE LOWER(CONCAT('%', :search, '%')))
+              AND (:status IS NULL OR o.status = :status)
+              AND (:storeId IS NULL OR store.id = :storeId)
+            """,
+            countQuery = """
+            SELECT COUNT(o) FROM Order o
             LEFT JOIN o.customer customer
             LEFT JOIN o.cashier cashier
             LEFT JOIN o.branch branch

@@ -310,6 +310,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<OrderDto> getSystemSalesPaged(int page, int size, String sortBy, String direction,
             String search, OrderStatus status, Long storeId) {
         accessControlService.requireAdmin(userService.getCurrentUser());
@@ -327,6 +328,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public SystemSalesSummaryDto getSystemSalesSummary() {
         accessControlService.requireAdmin(userService.getCurrentUser());
         LocalDate today = LocalDate.now();
@@ -342,7 +344,18 @@ public class OrderServiceImpl implements OrderService {
             dailyTotals.put(today.minusDays(day), 0.0);
         }
         orderRepository.findSalesRowsBetween(sevenDaysStart, tomorrowStart).forEach(row -> {
-            LocalDate date = ((LocalDateTime) row[0]).toLocalDate();
+            LocalDate date;
+            if (row[0] instanceof LocalDateTime ldt) {
+                date = ldt.toLocalDate();
+            } else if (row[0] instanceof java.sql.Timestamp ts) {
+                date = ts.toLocalDateTime().toLocalDate();
+            } else if (row[0] instanceof java.sql.Date d) {
+                date = d.toLocalDate();
+            } else if (row[0] instanceof java.time.Instant instant) {
+                date = instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+            } else {
+                date = LocalDate.parse(row[0].toString().substring(0, 10));
+            }
             double amount = row[1] == null ? 0.0 : ((Number) row[1]).doubleValue();
             dailyTotals.computeIfPresent(date, (key, value) -> value + amount);
         });

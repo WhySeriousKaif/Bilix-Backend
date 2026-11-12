@@ -17,8 +17,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     long countByCategoryId(Long categoryId);
     Page<Product> findByStoreId(Long storeId, Pageable pageable);
 
-    @Query("""
+    @Query(value = """
         SELECT p FROM Product p
+        LEFT JOIN p.category category
+        WHERE p.store.id = :storeId
+        AND (:search IS NULL
+            OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR LOWER(p.sku) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR LOWER(p.description) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR LOWER(category.name) LIKE LOWER(CONCAT('%', :search, '%')))
+        """,
+        countQuery = """
+        SELECT COUNT(p) FROM Product p
         LEFT JOIN p.category category
         WHERE p.store.id = :storeId
         AND (:search IS NULL

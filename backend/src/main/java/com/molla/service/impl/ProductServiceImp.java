@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -146,7 +147,9 @@ public class ProductServiceImp implements ProductService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<ProductDto> getProductsPaged(Long storeId, String search, Pageable pageable) {
+        accessControlService.requireStoreAccess(userService.getCurrentUser(), storeId);
         String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
         return productRepository.findByStoreIdFiltered(storeId, normalizedSearch, pageable)
                 .map(ProductMapper::toDto);

@@ -1,78 +1,15 @@
 services:
   - type: web
-    name: billix-backend
-    runtime: docker
-    region: singapore
-    plan: free
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
-    healthCheckPath: /health
-    envVars:
-      - key: SPRING_DATASOURCE_URL
-        fromDatabase:
-          name: billix-postgres
-          property: connectionString
-      - key: SPRING_JPA_DATABASE_PLATFORM
-        value: org.hibernate.dialect.PostgreSQLDialect
-      - key: SPRING_DATASOURCE_DRIVER
-        value: org.postgresql.Driver
-      - key: JPA_DDL_AUTO
-        value: update
-      - key: JWT_SECRET
-        generateValue: true
-      - key: SEED_ADMIN_PASSWORD
-        generateValue: true
-      - key: SEED_STORE_ADMIN_PASSWORD
-        generateValue: true
-      - key: SEED_MANAGER_PASSWORD
-        generateValue: true
-      - key: SEED_CASHIER_PASSWORD
-        generateValue: true
-      - key: ALLOWED_ORIGINS
-        sync: false
-      - key: AI_SERVICE_BASE_URL
-        fromService:
-          type: web
-          name: billix-ai
-          envVarKey: RENDER_EXTERNAL_HOSTNAME
-      - key: AI_SERVICE_API_KEY
-        fromService:
-          type: web
-          name: billix-ai
-          envVarKey: AI_SERVICE_API_KEY
-      - key: APP_CACHE_TYPE
-        value: memory
-      - key: DEMO_AI_DATA_ENABLED
-        value: true
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
-      - key: RAZORPAY_API_KEY
-        sync: false
-      - key: RAZORPAY_API_SECRET
-        sync: false
-      - key: STRIPE_PUBLIC_KEY
-        sync: false
-      - key: STRIPE_SECRET_KEY
-        sync: false
-
-  - type: web
     name: billix-ai
     runtime: docker
-    region: singapore
+    region: oregon
     plan: free
     dockerfilePath: ./ai-service/Dockerfile
     dockerContext: ./ai-service
     healthCheckPath: /health
     envVars:
       - key: SPRING_BASE_URL
-        fromService:
-          type: web
-          name: billix-backend
-          envVarKey: RENDER_EXTERNAL_HOSTNAME
+        sync: false
       - key: SPRING_API_TOKEN
         sync: false
       - key: AI_SERVICE_API_KEY
@@ -86,30 +23,3 @@ services:
       - key: OPENAI_EMBEDDING_DIMENSIONS
         value: 512
 
-  - type: web
-    name: billix-frontend
-    runtime: static
-    rootDir: pos-frontend
-    buildCommand: npm ci && npm run build
-    staticPublishPath: ./dist
-    envVars:
-      - key: VITE_API_HOST
-        fromService:
-          type: web
-          name: billix-backend
-          envVarKey: RENDER_EXTERNAL_HOSTNAME
-      - key: VITE_CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: VITE_CLOUDINARY_UPLOAD_PRESET
-        sync: false
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-
-databases:
-  - name: billix-postgres
-    region: singapore
-    plan: free
-    databaseName: billix
-    user: billix

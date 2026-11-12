@@ -2,6 +2,10 @@ import argparse
 import asyncio
 from datetime import datetime
 from pathlib import Path
+import sys
+
+# Ensure ai-service root is in sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.clients.billix_client import BillixClient
 from app.core.config import get_settings

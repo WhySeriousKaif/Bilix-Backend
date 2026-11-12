@@ -18,6 +18,10 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +29,11 @@ import org.springframework.data.domain.Pageable;
 @Service
 @RequiredArgsConstructor
 public class ProductServiceImp implements ProductService {
+    private static final Set<String> SEARCH_STOP_WORDS = Set.of(
+            "a", "all", "and", "category", "find", "for", "from",
+            "in", "of", "product", "products", "search", "store", "the"
+    );
+
     private final ProductRepository productRepository;
     private final StoreRepository storeRepository;
     private final CategoryRepository categoryRepository;
@@ -146,7 +155,38 @@ public class ProductServiceImp implements ProductService {
     @Override
     public List<ProductDto> searchByKeyword(Long storeId, String keyword) {
         accessControlService.requireStoreAccess(userService.getCurrentUser(), storeId);
-        List<Product> products = productRepository.searchByKeyword(storeId, keyword);
+        if (keyword == null || keyword.isBlank()) {
+            return List.of();
+        }
+
+        String normalized = keyword.trim().toLowerCase(Locale.ROOT);
+        List<String> tokens = List.of(normalized.split("[^a-z0-9]+"))
+                .stream()
+                .filter(token -> token.length() >= 2 && !SEARCH_STOP_WORDS.contains(token))
+                .toList();
+
+        List<Product> products;
+        if (tokens.isEmpty()) {
+            products = productRepository.searchByKeyword(storeId, normalized);
+        } else {
+            Map<Long, Product> matches = null;
+            for (String token : tokens) {
+                List<String> alternatives = token.startsWith("electronic")
+                        ? List.of(token, "elec")
+                        : List.of(token);
+                Map<Long, Product> tokenMatches = new LinkedHashMap<>();
+                for (String alternative : alternatives) {
+                    productRepository.searchByKeyword(storeId, alternative)
+                            .forEach(product -> tokenMatches.put(product.getId(), product));
+                }
+                if (matches == null) {
+                    matches = tokenMatches;
+                } else {
+                    matches.keySet().retainAll(tokenMatches.keySet());
+                }
+            }
+            products = matches == null ? List.of() : List.copyOf(matches.values());
+        }
         return products.stream().map(ProductMapper::toDto).collect(Collectors.toList());
     }
 

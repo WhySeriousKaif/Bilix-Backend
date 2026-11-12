@@ -40,13 +40,18 @@ public class DataInitializer {
             RefundRepository refundRepository,
             PasswordEncoder passwordEncoder) {
         return args -> {
+            String adminPassword = System.getenv().getOrDefault("SEED_ADMIN_PASSWORD", "Kaif0786@");
+            String storeAdminPassword = System.getenv().getOrDefault("SEED_STORE_ADMIN_PASSWORD", "StoreAdmin123@");
+            String managerPassword = System.getenv().getOrDefault("SEED_MANAGER_PASSWORD", "Manager123@");
+            String cashierPassword = System.getenv().getOrDefault("SEED_CASHIER_PASSWORD", "Cashier123@");
+
             // 1. Super Admin (ROLE_ADMIN)
             User admin = userRepository.findByEmail("kaiftruth101@gmail.com");
             if (admin == null) {
                 admin = new User();
                 admin.setFullName("Kaif");
                 admin.setEmail("kaiftruth101@gmail.com");
-                admin.setPassword(passwordEncoder.encode("Kaif0786@"));
+                admin.setPassword(passwordEncoder.encode(adminPassword));
                 admin.setRole(UserRole.ROLE_ADMIN);
                 admin.setCreatedAt(LocalDateTime.now());
                 admin.setUpdatedAt(LocalDateTime.now());
@@ -60,7 +65,7 @@ public class DataInitializer {
                 storeAdmin = new User();
                 storeAdmin.setFullName("Store Admin");
                 storeAdmin.setEmail("storeadmin@molla.com");
-                storeAdmin.setPassword(passwordEncoder.encode("StoreAdmin123@"));
+                storeAdmin.setPassword(passwordEncoder.encode(storeAdminPassword));
                 storeAdmin.setRole(UserRole.ROLE_STORE_ADMIN);
                 storeAdmin.setCreatedAt(LocalDateTime.now());
                 storeAdmin.setUpdatedAt(LocalDateTime.now());
@@ -100,7 +105,7 @@ public class DataInitializer {
                 manager = new User();
                 manager.setFullName("Branch Manager");
                 manager.setEmail("manager@molla.com");
-                manager.setPassword(passwordEncoder.encode("Manager123@"));
+                manager.setPassword(passwordEncoder.encode(managerPassword));
                 manager.setRole(UserRole.ROLE_BRANCH_MANAGER);
                 manager.setStore(store);
                 manager.setCreatedAt(LocalDateTime.now());
@@ -138,7 +143,7 @@ public class DataInitializer {
                 cashier = new User();
                 cashier.setFullName("Alex Johnson");
                 cashier.setEmail("cashier@molla.com");
-                cashier.setPassword(passwordEncoder.encode("Cashier123@"));
+                cashier.setPassword(passwordEncoder.encode(cashierPassword));
                 cashier.setRole(UserRole.ROLE_CASHIER);
                 cashier.setStore(store);
                 cashier.setBranch(branch);
@@ -157,7 +162,7 @@ public class DataInitializer {
                 cashier2 = new User();
                 cashier2.setFullName("Sarah Connor");
                 cashier2.setEmail("cashier2@molla.com");
-                cashier2.setPassword(passwordEncoder.encode("Cashier123@"));
+                cashier2.setPassword(passwordEncoder.encode(cashierPassword));
                 cashier2.setRole(UserRole.ROLE_CASHIER);
                 cashier2.setStore(store);
                 cashier2.setBranch(branch);

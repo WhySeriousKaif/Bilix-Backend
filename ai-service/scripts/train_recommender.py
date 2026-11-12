@@ -2,7 +2,11 @@ import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
 from typing import Any
+
+# Ensure ai-service root is in sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import joblib
 import pandas as pd

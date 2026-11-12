@@ -19,12 +19,19 @@ public class AiServiceConfig {
             @Value("${app.ai.base-url}")
             String baseUrl,
 
+            @Value("${app.ai.api-key:}")
+            String apiKey,
+
             @Value("${app.ai.connect-timeout}")
             Duration connectTimeout,
 
             @Value("${app.ai.read-timeout}")
             Duration readTimeout
     ) {
+        String normalizedBaseUrl = baseUrl.matches("^https?://.*")
+                ? baseUrl
+                : "https://" + baseUrl;
+
         SimpleClientHttpRequestFactory requestFactory =
                 new SimpleClientHttpRequestFactory();
 
@@ -40,9 +47,14 @@ public class AiServiceConfig {
                 RestClient.builder()
         );
 
-        return builder
-                .baseUrl(baseUrl)
-                .requestFactory(requestFactory)
-                .build();
+        builder
+                .baseUrl(normalizedBaseUrl)
+                .requestFactory(requestFactory);
+
+        if (!apiKey.isBlank()) {
+            builder.defaultHeader("X-AI-Service-Key", apiKey);
+        }
+
+        return builder.build();
     }
 }

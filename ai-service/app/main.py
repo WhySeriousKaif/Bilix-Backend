@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -7,8 +8,17 @@ from fastapi import (
     HTTPException,
     Request,
 )
+from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
+from app.clients.billix_client import BillixClient
+from app.rag.embedding_provider import create_openai_embedding_provider
+from app.rag.policy_retriever import PolicyRetriever
+from app.schemas.assistant import (
+    AssistantHealthResponse,
+    AssistantRequest,
+    AssistantResponse,
+)
 from app.schemas.recommendation import (
     HealthResponse,
     RecommendationRequest,
@@ -17,10 +27,16 @@ from app.schemas.recommendation import (
 from app.services.recommendation_service import (
     RecommendationService,
 )
+from app.services.assistant_service import AssistantService
+from app.services.assistant_tools import AssistantTools
+
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(
     model_directory: Path | None = None,
+    assistant_service: AssistantService | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(
@@ -40,6 +56,55 @@ def create_app(
             )
         )
 
+        app.state.policy_index_loaded = False
+        app.state.assistant_service = assistant_service
+
+        if app.state.assistant_service is None:
+            if settings.openai_api_key is None:
+                logger.info(
+                    "Assistant disabled because OPENAI_API_KEY is not configured."
+                )
+            elif not settings.policy_index_path.exists():
+                logger.info(
+                    "Assistant disabled because the policy index does not exist: %s",
+                    settings.policy_index_path,
+                )
+            else:
+                try:
+                    embedding_provider = create_openai_embedding_provider(
+                        settings
+                    )
+                    policy_retriever = PolicyRetriever.load(
+                        settings.policy_index_path,
+                        embedding_provider=embedding_provider,
+                    )
+                    tools = AssistantTools(
+                        billix_client=BillixClient(settings),
+                        recommendation_service=(
+                            app.state.recommendation_service
+                        ),
+                        policy_retriever=policy_retriever,
+                    )
+                    app.state.assistant_service = (
+                        AssistantService.from_api_key(
+                            api_key=(
+                                settings.openai_api_key.get_secret_value()
+                            ),
+                            tools=tools,
+                            model=settings.openai_chat_model,
+                            max_tool_rounds=(
+                                settings.assistant_max_tool_rounds
+                            ),
+                        )
+                    )
+                    app.state.policy_index_loaded = True
+                except Exception:
+                    logger.exception(
+                        "Assistant initialization failed; recommendation API remains available."
+                    )
+        else:
+            app.state.policy_index_loaded = True
+
         yield
 
     application = FastAPI(
@@ -47,6 +112,22 @@ def create_app(
         version="1.0.0",
         lifespan=lifespan,
     )
+
+    @application.middleware("http")
+    async def verify_service_key(request: Request, call_next):
+        settings = get_settings()
+        expected_key = settings.ai_service_api_key.get_secret_value()
+        public_paths = {"/health", "/assistant/health", "/docs", "/openapi.json"}
+        if (
+            expected_key
+            and request.url.path not in public_paths
+            and request.headers.get("X-AI-Service-Key") != expected_key
+        ):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid AI service key."},
+            )
+        return await call_next(request)
 
     @application.get(
         "/health",
@@ -117,6 +198,52 @@ def create_app(
             model_version=service.model_version,
         )
 
+    @application.get(
+        "/assistant/health",
+        response_model=AssistantHealthResponse,
+    )
+    async def assistant_health(
+        request: Request,
+    ) -> AssistantHealthResponse:
+        loaded = (
+            getattr(
+                request.app.state,
+                "assistant_service",
+                None,
+            )
+            is not None
+        )
+        return AssistantHealthResponse(
+            status="UP" if loaded else "DOWN",
+            assistant_loaded=loaded,
+            policy_index_loaded=bool(
+                getattr(
+                    request.app.state,
+                    "policy_index_loaded",
+                    False,
+                )
+            ),
+        )
+
+    @application.post(
+        "/assistant/chat",
+        response_model=AssistantResponse,
+    )
+    async def assistant_chat(
+        payload: AssistantRequest,
+        request: Request,
+    ) -> AssistantResponse:
+        service = get_assistant_service(
+            request
+        )
+        try:
+            return await service.answer(payload)
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail=str(error),
+            ) from error
+
     return application
 
 
@@ -138,6 +265,25 @@ def get_recommendation_service(
             ),
         )
 
+    return service
+
+
+def get_assistant_service(
+    request: Request,
+) -> AssistantService:
+    service = getattr(
+        request.app.state,
+        "assistant_service",
+        None,
+    )
+    if service is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Assistant is unavailable. Configure OPENAI_API_KEY "
+                "and build the policy index."
+            ),
+        )
     return service
 
 

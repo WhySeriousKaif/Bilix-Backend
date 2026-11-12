@@ -1,8 +1,12 @@
 import argparse
-import json
 from collections.abc import Callable
+import json
 from pathlib import Path
+import sys
 from typing import Any
+
+# Ensure ai-service root is in sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
 

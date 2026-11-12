@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -45,6 +46,7 @@ class AiAssistantServiceImplTest {
                         requestTo("http://localhost:8000/assistant/chat")
                 )
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer current-user-token"))
                 .andExpect(content().json("""
                         {
                           "store_id": 1,
@@ -92,7 +94,8 @@ class AiAssistantServiceImplTest {
                         ),
                         "manager",
                         null
-                )
+                ),
+                "Bearer current-user-token"
         );
 
         assertThat(response.available()).isTrue();
@@ -120,7 +123,8 @@ class AiAssistantServiceImplTest {
                         List.of(),
                         "manager",
                         null
-                )
+                ),
+                "Bearer current-user-token"
         );
 
         assertThat(response.available()).isFalse();

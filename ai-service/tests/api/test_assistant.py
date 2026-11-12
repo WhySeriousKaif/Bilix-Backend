@@ -63,6 +63,7 @@ def test_assistant_chat_returns_grounded_response(
     with TestClient(application) as client:
         response = client.post(
             "/assistant/chat",
+            headers={"Authorization": "Bearer current-user-token"},
             json=payload,
         )
     assert response.status_code == 200
@@ -86,6 +87,7 @@ def test_assistant_chat_rejects_invalid_request(
     with TestClient(application) as client:
         response = client.post(
             "/assistant/chat",
+            headers={"Authorization": "Bearer current-user-token"},
             json={
                 "store_id": 0,
                 "branch_id": -1,
@@ -109,6 +111,7 @@ def test_assistant_returns_503_when_not_configured(
         health = client.get("/assistant/health")
         response = client.post(
             "/assistant/chat",
+            headers={"Authorization": "Bearer current-user-token"},
             json={
                 "store_id": 1,
                 "branch_id": 1,
@@ -118,3 +121,24 @@ def test_assistant_returns_503_when_not_configured(
     assert health.json()["status"] == "DOWN"
     assert response.status_code == 503
     get_settings.cache_clear()
+
+
+def test_assistant_chat_requires_user_authorization(
+    tmp_path: Path,
+) -> None:
+    create_model_artifacts(tmp_path)
+    application = create_app(
+        model_directory=tmp_path,
+        assistant_service=FakeAssistantService(),
+    )
+    with TestClient(application) as client:
+        response = client.post(
+            "/assistant/chat",
+            json={
+                "store_id": 1,
+                "branch_id": 1,
+                "message": "Show branch sales",
+            },
+        )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "A signed-in Billix user is required."

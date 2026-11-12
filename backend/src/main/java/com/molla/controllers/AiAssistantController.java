@@ -21,6 +21,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,6 +48,7 @@ public class AiAssistantController {
 
     @PostMapping("/chat")
     public ResponseEntity<AssistantResponseDto> chat(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @Valid @RequestBody AssistantChatRequestDto request
     ) {
         User currentUser = userService.getCurrentUser();
@@ -78,12 +81,13 @@ public class AiAssistantController {
         );
 
         return ResponseEntity.ok(
-                aiAssistantService.chat(aiRequest)
+                aiAssistantService.chat(aiRequest, authorization)
         );
     }
 
     @PostMapping("/system/chat")
     public ResponseEntity<AssistantResponseDto> systemChat(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @Valid @RequestBody SystemAssistantChatRequestDto request
     ) {
         User currentUser = userService.getCurrentUser();
@@ -114,6 +118,6 @@ public class AiAssistantController {
                 context
         );
 
-        return ResponseEntity.ok(aiAssistantService.chat(aiRequest));
+        return ResponseEntity.ok(aiAssistantService.chat(aiRequest, authorization));
     }
 }

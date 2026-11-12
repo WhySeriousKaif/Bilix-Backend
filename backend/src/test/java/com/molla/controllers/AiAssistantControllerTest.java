@@ -56,10 +56,14 @@ class AiAssistantControllerTest {
 
         when(userService.getCurrentUser()).thenReturn(currentUser);
         when(branchRepository.findById(3L)).thenReturn(Optional.of(branch));
-        when(aiAssistantService.chat(org.mockito.ArgumentMatchers.any()))
+        when(aiAssistantService.chat(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString()
+        ))
                 .thenReturn(AssistantResponseDto.unavailable());
 
         controller.chat(
+                "Bearer manager-token",
                 new AssistantChatRequestDto(
                         3L,
                         "What products sell with coffee?",
@@ -73,7 +77,10 @@ class AiAssistantControllerTest {
         ArgumentCaptor<AiAssistantRequest> requestCaptor =
                 ArgumentCaptor.forClass(AiAssistantRequest.class);
 
-        verify(aiAssistantService).chat(requestCaptor.capture());
+        verify(aiAssistantService).chat(
+                requestCaptor.capture(),
+                org.mockito.ArgumentMatchers.eq("Bearer manager-token")
+        );
 
         AiAssistantRequest forwarded = requestCaptor.getValue();
         assertThat(forwarded.storeId()).isEqualTo(7L);

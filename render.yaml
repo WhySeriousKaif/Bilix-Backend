@@ -10,8 +10,6 @@ services:
     envVars:
       - key: SPRING_BASE_URL
         sync: false
-      - key: SPRING_API_TOKEN
-        sync: false
       - key: AI_SERVICE_API_KEY
         generateValue: true
       - key: OPENAI_API_KEY

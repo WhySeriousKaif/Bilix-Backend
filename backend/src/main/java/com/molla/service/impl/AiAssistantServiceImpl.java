@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -20,11 +21,15 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private final RestClient aiRestClient;
 
     @Override
-    public AssistantResponseDto chat(AiAssistantRequest request) {
+    public AssistantResponseDto chat(
+            AiAssistantRequest request,
+            String userAuthorization
+    ) {
         try {
             AiAssistantResponse response = aiRestClient
                     .post()
                     .uri("/assistant/chat")
+                    .header(HttpHeaders.AUTHORIZATION, userAuthorization)
                     .body(request)
                     .retrieve()
                     .body(AiAssistantResponse.class);

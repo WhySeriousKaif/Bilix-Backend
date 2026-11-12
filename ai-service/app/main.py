@@ -11,6 +11,10 @@ from fastapi import (
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
+from app.core.auth_context import (
+    reset_user_authorization,
+    set_user_authorization,
+)
 from app.clients.billix_client import BillixClient
 from app.rag.embedding_provider import create_openai_embedding_provider
 from app.rag.policy_retriever import PolicyRetriever
@@ -233,9 +237,17 @@ def create_app(
         payload: AssistantRequest,
         request: Request,
     ) -> AssistantResponse:
+        authorization = request.headers.get("Authorization", "").strip()
+        if not authorization.startswith("Bearer ") or not authorization[7:].strip():
+            raise HTTPException(
+                status_code=401,
+                detail="A signed-in Billix user is required.",
+            )
+
         service = get_assistant_service(
             request
         )
+        context_token = set_user_authorization(authorization)
         try:
             return await service.answer(payload)
         except RuntimeError as error:
@@ -243,6 +255,8 @@ def create_app(
                 status_code=503,
                 detail=str(error),
             ) from error
+        finally:
+            reset_user_authorization(context_token)
 
     return application
 

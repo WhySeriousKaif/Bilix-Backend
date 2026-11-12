@@ -10,6 +10,10 @@ from httpx import Response
 
 from app.clients.billix_client import BillixClient
 from app.core.config import Settings
+from app.core.auth_context import (
+    reset_user_authorization,
+    set_user_authorization,
+)
 from app.services.assistant_tools import AssistantTools, UnknownToolError
 from app.services.recommendation_service import RecommendationService
 from app.rag.policy_retriever import PolicyRetriever
@@ -59,7 +63,6 @@ def create_recommendation_service(directory: Path) -> RecommendationService:
 def tools(tmp_path: Path) -> AssistantTools:
     settings = Settings(
         spring_base_url="http://billix.test",
-        spring_api_token="test-token",
         request_timeout_seconds=5,
         _env_file=None,
     )
@@ -70,7 +73,8 @@ def tools(tmp_path: Path) -> AssistantTools:
         "Opened food cannot be returned unless defective.",
         encoding="utf-8",
     )
-    return AssistantTools(
+    context_token = set_user_authorization("Bearer current-user-token")
+    assistant_tools = AssistantTools(
         billix_client=BillixClient(settings),
         recommendation_service=create_recommendation_service(tmp_path),
         policy_retriever=PolicyRetriever.build(
@@ -78,6 +82,10 @@ def tools(tmp_path: Path) -> AssistantTools:
             embedding_provider=FakeEmbeddingProvider(),
         ),
     )
+    try:
+        yield assistant_tools
+    finally:
+        reset_user_authorization(context_token)
 
 
 def test_tool_definitions_are_available() -> None:
@@ -117,6 +125,9 @@ async def test_search_products_tool(tools: AssistantTools) -> None:
         {"store_id": 1, "query": "coffee", "limit": 5},
     )
     assert route.called
+    assert route.calls.last.request.headers["Authorization"] == (
+        "Bearer current-user-token"
+    )
     assert result.tool_name == "search_products"
     assert result.data["products"][0]["product_id"] == 3
     assert result.data["products"][0]["name"] == "Instant Coffee"

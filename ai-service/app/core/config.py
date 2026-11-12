@@ -13,8 +13,6 @@ class Settings(BaseSettings):
         "http://localhost:8080"
     )
 
-    spring_api_token: SecretStr = SecretStr("")
-
     ai_service_api_key: SecretStr = SecretStr("")
 
     request_timeout_seconds: float = 20.0

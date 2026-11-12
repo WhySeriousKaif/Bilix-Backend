@@ -7,6 +7,7 @@ from urllib.parse import quote
 import httpx
 
 from app.core.config import Settings
+from app.core.auth_context import get_user_authorization
 from app.schemas.assistant_tools import InventoryResponse, ProductSummary
 from app.schemas.transaction import Transaction
 
@@ -19,13 +20,10 @@ class BillixClient:
 
     def __init__(self, settings: Settings) -> None:
         self._base_url = settings.spring_base_url.rstrip("/")
-        self._token = (
-            settings.spring_api_token.get_secret_value()
-        )
         self._timeout = settings.request_timeout_seconds
 
     def _authorization_headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self._token}"}
+        return {"Authorization": get_user_authorization()}
 
     async def _get_json(
         self,

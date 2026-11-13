@@ -27,6 +27,9 @@ The UI displayed `Product.quantity`, which is a catalogue-level value, instead o
 - Products without a branch inventory row, and products with zero branch stock, are omitted from the sellable grid.
 - Barcode lookup and category counts now operate only on the branch-scoped list.
 - Smart Suggestions resolves recommendation IDs only against stocked products in the cashier's branch, so unstocked recommendations are discarded.
+- Product cards explicitly label the quantity as stock available **in this branch**.
+- The cart rejects any product that does not carry a branch inventory identifier, providing a second frontend safeguard if a store-level product is accidentally passed to it later.
+- The product and transaction areas have a visible draggable divider (mouse and touch), allowing the cashier to widen the transaction panel and inspect selected items. The chosen width is saved locally.
 - The frontend production build passed, and both modified files passed targeted ESLint validation.
 
 ### Why backend checkout validation remains necessary

@@ -29,7 +29,9 @@ The UI displayed `Product.quantity`, which is a catalogue-level value, instead o
 - Smart Suggestions resolves recommendation IDs only against stocked products in the cashier's branch, so unstocked recommendations are discarded.
 - Product cards explicitly label the quantity as stock available **in this branch**.
 - The cart rejects any product that does not carry a branch inventory identifier, providing a second frontend safeguard if a store-level product is accidentally passed to it later.
-- The product and transaction areas have a visible draggable divider (mouse and touch), allowing the cashier to widen the transaction panel and inspect selected items. The chosen width is saved locally.
+- The product and transaction areas have a visible draggable divider (mouse and touch), allowing the cashier to widen the transaction panel and inspect selected items. A second horizontal divider resizes the selected-item area and moves Smart Suggestions/payment controls up or down. Both choices are saved locally.
+- Recommendations are intersected with the branch's positive inventory. A branch with only one stocked product may legitimately show no cross-sell result because recommending an unavailable product would create an invalid sale.
+- Adding another already-modelled product to branch inventory does not require restarting Python. Retraining is needed only when new completed-order patterns should change the association rules or popularity ranking.
 - The frontend production build passed, and both modified files passed targeted ESLint validation.
 
 ### Why backend checkout validation remains necessary

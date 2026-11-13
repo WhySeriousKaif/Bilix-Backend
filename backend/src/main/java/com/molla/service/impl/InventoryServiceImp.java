@@ -1,6 +1,7 @@
 package com.molla.service.impl;
 
 import com.molla.mapper.InventoryMapper;
+import com.molla.exceptions.NotFoundException;
 import com.molla.model.Branch;
 import com.molla.model.Inventory;
 import com.molla.model.Product;
@@ -78,7 +79,9 @@ public class InventoryServiceImp implements InventoryService {
     public InventoryDto getInventoryByProductIdAndBranchId(Long productId, Long branchId) {
         accessControlService.requireBranchAccess(userService.getCurrentUser(), branchId);
         Inventory inventory = inventoryRepository.findByProductIdAndBranchId(productId, branchId)
-                .orElseThrow(() -> new RuntimeException("Inventory not found"));
+                .orElseThrow(() -> new NotFoundException(
+                        "Product is not stocked at branch " + branchId
+                ));
         return InventoryMapper.toDto(inventory);
     }
 

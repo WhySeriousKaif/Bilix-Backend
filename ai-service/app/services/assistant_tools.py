@@ -52,7 +52,8 @@ class AssistantTools:
                 name="get_inventory",
                 description=(
                     "Get the current inventory quantity for one product "
-                    "in one branch."
+                    "in one branch. If stocked is false, the product exists "
+                    "in the catalogue but has no inventory record at that branch."
                 ),
                 input_schema=GetInventoryArguments.model_json_schema(),
             ),
@@ -186,7 +187,8 @@ class AssistantTools:
                 "product_id": arguments.product_id,
                 "product_name": product_name,
                 "quantity": inventory.quantity,
-                "available": inventory.quantity > 0,
+                "available": inventory.stocked and inventory.quantity > 0,
+                "stocked": inventory.stocked,
             },
         )
 

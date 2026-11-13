@@ -162,7 +162,40 @@ async def test_inventory_tool(tools: AssistantTools) -> None:
     assert route.called
     assert result.data["quantity"] == 26
     assert result.data["available"] is True
+    assert result.data["stocked"] is True
     assert result.data["product_name"] == "Chocolate"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_missing_branch_inventory_is_not_a_system_error(
+    tools: AssistantTools,
+) -> None:
+    respx.get(
+        "http://billix.test/api/inventories/product/12/branch/1"
+    ).mock(
+        return_value=Response(
+            404,
+            json={
+                "error": "NOT_FOUND",
+                "message": "Product is not stocked at branch 1",
+            },
+        )
+    )
+
+    result = await tools.execute(
+        "get_inventory",
+        {"branch_id": 1, "product_id": 12},
+    )
+
+    assert result.data == {
+        "branch_id": 1,
+        "product_id": 12,
+        "product_name": None,
+        "quantity": 0,
+        "available": False,
+        "stocked": False,
+    }
 
 
 @pytest.mark.asyncio

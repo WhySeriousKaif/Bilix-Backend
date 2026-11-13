@@ -16,6 +16,10 @@ class BillixApiError(RuntimeError):
     pass
 
 
+class BillixNotFoundError(BillixApiError):
+    pass
+
+
 class BillixClient:
 
     def __init__(self, settings: Settings) -> None:
@@ -42,6 +46,10 @@ class BillixClient:
                 )
                 response.raise_for_status()
         except httpx.HTTPStatusError as error:
+            if error.response.status_code == 404:
+                raise BillixNotFoundError(
+                    "The requested Billix resource was not found."
+                ) from error
             raise BillixApiError(
                 "Billix API rejected the request: "
                 f"{error.response.status_code} {error.response.text}"
@@ -110,9 +118,17 @@ class BillixClient:
         branch_id: int,
         product_id: int,
     ) -> InventoryResponse:
-        payload = await self._get_json(
-            f"/api/inventories/product/{product_id}/branch/{branch_id}"
-        )
+        try:
+            payload = await self._get_json(
+                f"/api/inventories/product/{product_id}/branch/{branch_id}"
+            )
+        except BillixNotFoundError:
+            return InventoryResponse(
+                branchId=branch_id,
+                productId=product_id,
+                quantity=0,
+                stocked=False,
+            )
 
         if not isinstance(payload, dict):
             raise BillixApiError(

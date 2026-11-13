@@ -2,6 +2,74 @@
 
 This document records important problems encountered while building and deploying Billix POS, how they were diagnosed, how they were fixed, and how the design should evolve for production. It contains no credentials or production secrets.
 
+## 0A. Why did a Branch 2 cashier see products stocked only in other branches?
+
+### Symptom
+
+A Store Admin created Branch 2, assigned a Branch Manager and Cashier, and stocked only 12 egg trays at that branch. The Branch 2 cashier terminal still displayed all ten products from the store catalogue. Selecting any product other than eggs failed during checkout because the backend correctly rejected products without a Branch 2 inventory record.
+
+### Root cause
+
+The authorization and checkout validation were correct, but the terminal's read path used the wrong data source:
+
+```text
+Cashier terminal -> products for storeId -> every store product
+Checkout         -> inventory for branchId -> only Branch 2 stock
+```
+
+The UI displayed `Product.quantity`, which is a catalogue-level value, instead of `Inventory.quantity`, which is the live branch-level value. Smart Suggestions also resolved recommendation IDs against the whole store catalogue, so it could recommend products the cashier was not allowed to sell at that branch.
+
+### Fix
+
+- The terminal now obtains the authenticated cashier's `branchId` from the server profile.
+- It loads `/api/inventories/branch/{branchId}` instead of `/api/products/storeId/{storeId}`.
+- Each inventory row is mapped to its nested product with the live branch quantity.
+- Products without a branch inventory row, and products with zero branch stock, are omitted from the sellable grid.
+- Barcode lookup and category counts now operate only on the branch-scoped list.
+- Smart Suggestions resolves recommendation IDs only against stocked products in the cashier's branch, so unstocked recommendations are discarded.
+- The frontend production build passed, and both modified files passed targeted ESLint validation.
+
+### Why backend checkout validation remains necessary
+
+Filtering the UI improves correctness and usability but is not a security boundary. Inventory can change after the page loads, and a malicious client can construct its own request. The backend therefore still locks and validates the branch inventory row during checkout before decrementing stock.
+
+### Interview answer
+
+> The cashier screen and checkout used inconsistent scopes. The screen loaded the store catalogue, but checkout validated branch inventory, so users saw products that their branch could not sell. I changed the read model to use the authenticated cashier's branch inventory and mapped the branch quantity onto each product. I applied the same filter to AI recommendations, while retaining transactional backend stock validation because UI filtering alone cannot prevent stale or forged checkout requests.
+
+---
+
+## 0. Why could Copilot find a product but not report its stock?
+
+### Symptom
+
+As a Store Admin, asking whether eggs were in inventory returned the catalogue product and price, but Copilot said an internal system error prevented it from retrieving the quantity.
+
+### Diagnosis
+
+The two-stage tool flow was working correctly:
+
+1. `search_products` found the product in the store catalogue.
+2. `get_inventory` looked for that product in the selected branch.
+
+The deployed Render logs showed `RuntimeException: Inventory not found` at the exact request times. The product existed, but it had no separate branch inventory row. The backend converted that normal missing-data condition into HTTP 500, so the AI could only describe it as a system failure.
+
+### Fix
+
+- Changed missing branch inventory from a generic runtime exception to `NotFoundException`, producing HTTP 404.
+- Made the Python Billix client distinguish 404 from connectivity and server failures.
+- Converted the expected 404 into a structured tool result with `stocked=false`, `available=false`, and `quantity=0`.
+- Instructed the assistant to explain that the catalogue product is not stocked at the selected branch instead of claiming a system error.
+- Added a regression test for a catalogue product without a branch inventory record.
+
+The implementation deliberately does not fall back to `Product.quantity`: checkout updates the branch `Inventory.quantity`, so the catalogue value can become stale and could produce an incorrect stock answer.
+
+### Interview answer
+
+> Copilot used two grounded tools: catalogue search followed by branch inventory lookup. A product without a branch inventory row caused a generic exception and appeared to the model as an internal failure. I verified the exact exception in production logs, changed the backend to return a semantic 404, and made the AI adapter translate that expected state into a typed `stocked=false` result. I avoided falling back to the catalogue quantity because branch checkout updates a different stock field. This produced an honest answer without hallucinating availability, and I added a regression test for it.
+
+---
+
 ## 1. How should Copilot authentication work for many users and roles?
 
 ### Interview question

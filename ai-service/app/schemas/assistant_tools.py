@@ -32,6 +32,7 @@ class InventoryResponse(SpringApiModel):
     productId: int | None = None
     quantity: int
     product: InventoryProduct | None = None
+    stocked: bool = True
 
 
 class SearchProductsArguments(BaseModel):

@@ -62,7 +62,22 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
                 c.id, c.name, c.email, c.phone, COUNT(o), COALESCE(SUM(o.totalAmount), 0), MAX(o.createdAt))
             FROM Order o JOIN o.customer c
             WHERE o.branch.id = :branchId
-              AND (:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
+            GROUP BY c.id, c.name, c.email, c.phone
+            ORDER BY MAX(o.createdAt) DESC
+            """,
+            countQuery = """
+            SELECT COUNT(DISTINCT c.id) FROM Order o JOIN o.customer c
+            WHERE o.branch.id = :branchId
+            """)
+    Page<BranchCustomerDto> findBranchCustomers(@Param("branchId") Long branchId,
+            Pageable pageable);
+
+    @Query(value = """
+            SELECT new com.molla.payload.dto.BranchCustomerDto(
+                c.id, c.name, c.email, c.phone, COUNT(o), COALESCE(SUM(o.totalAmount), 0), MAX(o.createdAt))
+            FROM Order o JOIN o.customer c
+            WHERE o.branch.id = :branchId
+              AND (LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR c.phone LIKE CONCAT('%', :search, '%'))
             GROUP BY c.id, c.name, c.email, c.phone
@@ -71,11 +86,11 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
             countQuery = """
             SELECT COUNT(DISTINCT c.id) FROM Order o JOIN o.customer c
             WHERE o.branch.id = :branchId
-              AND (:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
+              AND (LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR c.phone LIKE CONCAT('%', :search, '%'))
             """)
-    Page<BranchCustomerDto> findBranchCustomers(@Param("branchId") Long branchId,
+    Page<BranchCustomerDto> searchBranchCustomers(@Param("branchId") Long branchId,
             @Param("search") String search, Pageable pageable);
 
     @Query(value = """

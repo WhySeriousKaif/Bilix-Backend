@@ -39,6 +39,31 @@ Filtering the UI improves correctness and usability but is not a security bounda
 
 ---
 
+## 0B. Why did the Branch Customers page return an unexpected error?
+
+### Symptom
+
+Opening the Branch Customers page without entering a search term returned HTTP 500 and displayed `An unexpected error occurred`, even though the branch correctly had no completed customer purchases yet.
+
+### Root cause
+
+The service normalized a blank search field to `null` and passed it into one paginated JPQL query that also used the same parameter inside several `LIKE` and `CONCAT` expressions. PostgreSQL can fail to infer the SQL type of a null-bound parameter in this pattern. The generic exception handler then hid the database error behind the frontend's standard 500 message.
+
+### Fix
+
+- Split the repository operation into two explicit queries.
+- The normal list query has no search parameter at all.
+- The search query is called only with a nonblank string.
+- Both queries remain scoped by `branchId`, including their pagination count queries.
+- Added a regression test proving that blank search uses the parameter-free query.
+- Ran the complete Spring suite: **43 tests passed**.
+
+### Interview answer
+
+> A production-only 500 occurred because the branch customer query passed a null search value into PostgreSQL `LIKE/CONCAT` expressions. Instead of adding database-specific casts, I removed the ambiguity: blank search and text search now use separate repository queries, and both remain branch-scoped. I added a regression test for the blank-search path and verified the full backend suite. This also improved the query contract because the search query can no longer receive null.
+
+---
+
 ## 0. Why could Copilot find a product but not report its stock?
 
 ### Symptom

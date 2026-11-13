@@ -47,18 +47,30 @@ class CustomerServiceImplTest {
     void branchCustomerPagingNormalizesSearchAndPageLimits() {
         User user = branchUser(4L);
         when(userService.getCurrentUser()).thenReturn(user);
-        when(orderRepository.findBranchCustomers(any(), any(), any())).thenReturn(Page.empty());
+        when(orderRepository.searchBranchCustomers(any(), any(), any())).thenReturn(Page.empty());
 
         customerService.getBranchCustomers(4L, "  alice  ", -2, 500);
 
         verify(accessControlService).requireBranchAccess(user, 4L);
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(orderRepository).findBranchCustomers(
+        verify(orderRepository).searchBranchCustomers(
                 org.mockito.ArgumentMatchers.eq(4L),
                 org.mockito.ArgumentMatchers.eq("alice"),
                 pageable.capture());
         assertEquals(0, pageable.getValue().getPageNumber());
         assertEquals(100, pageable.getValue().getPageSize());
+    }
+
+    @Test
+    void branchCustomerPagingUsesQueryWithoutNullableSearchWhenSearchIsBlank() {
+        User user = branchUser(4L);
+        when(userService.getCurrentUser()).thenReturn(user);
+        when(orderRepository.findBranchCustomers(any(), any())).thenReturn(Page.empty());
+
+        customerService.getBranchCustomers(4L, "   ", 0, 10);
+
+        verify(accessControlService).requireBranchAccess(user, 4L);
+        verify(orderRepository).findBranchCustomers(4L, PageRequest.of(0, 10));
     }
 
     @Test

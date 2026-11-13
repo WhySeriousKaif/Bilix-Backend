@@ -69,7 +69,9 @@ public class CustomerServiceImpl implements CustomerService {
         accessControlService.requireBranchAccess(userService.getCurrentUser(), branchId);
         String term = normalizeSearch(search);
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100)));
-        return orderRepository.findBranchCustomers(branchId, term, pageable);
+        return term == null
+                ? orderRepository.findBranchCustomers(branchId, pageable)
+                : orderRepository.searchBranchCustomers(branchId, term, pageable);
     }
 
     @Override

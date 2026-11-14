@@ -7,6 +7,7 @@ import com.molla.model.Branch;
 import com.molla.model.User;
 import com.molla.repository.BranchRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -45,7 +46,7 @@ public class AccessControlService {
             if (userStoreId != null && userStoreId.equals(branchStoreId)) {
                 return;
             }
-            throw new BadRequestException("You do not have access to this branch");
+            throw new AccessDeniedException("You do not have access to this branch");
         }
 
         // Branch manager / cashier / branch cashier — must be assigned to this exact branch
@@ -54,7 +55,7 @@ public class AccessControlService {
             return;
         }
 
-        throw new BadRequestException("You do not have access to this branch");
+        throw new AccessDeniedException("You do not have access to this branch");
     }
 
     public void requireStoreAccess(User user, Long storeId) {
@@ -78,7 +79,7 @@ public class AccessControlService {
             return;
         }
 
-        throw new BadRequestException("You do not have access to this store");
+        throw new AccessDeniedException("You do not have access to this store");
     }
 
     /**
@@ -99,7 +100,7 @@ public class AccessControlService {
             if (userStoreId != null && userStoreId.equals(branchStoreId)) {
                 return;
             }
-            throw new BadRequestException("You do not have management access to this branch");
+            throw new AccessDeniedException("You do not have management access to this branch");
         }
         if (user.getRole() == UserRole.ROLE_BRANCH_MANAGER) {
 
@@ -109,9 +110,9 @@ public class AccessControlService {
                 return;
             }
 
-            throw new BadRequestException("You do not have management access to this branch");
+            throw new AccessDeniedException("You do not have management access to this branch");
         }
-        throw new BadRequestException("Only a Store Admin, Store Manager, Branch Manager, or Super Admin can manage employees");
+        throw new AccessDeniedException("Only a Store Admin, Store Manager, Branch Manager, or Super Admin can manage employees");
     }
 
     /**
@@ -132,13 +133,13 @@ public class AccessControlService {
             if (userStoreId != null && userStoreId.equals(branchStoreId)) {
                 return;
             }
-            throw new BadRequestException("You do not have access to this branch");
+            throw new AccessDeniedException("You do not have access to this branch");
         }
 
         if (user.getRole() != UserRole.ROLE_BRANCH_MANAGER &&
                 user.getRole() != UserRole.ROLE_BRANCH_CASHIER &&
                 user.getRole() != UserRole.ROLE_CASHIER) {
-            throw new BadRequestException("This role cannot edit branch information");
+            throw new AccessDeniedException("This role cannot edit branch information");
         }
         Long userBranchId = user.getBranch() != null ? user.getBranch().getId() : null;
 
@@ -146,7 +147,7 @@ public class AccessControlService {
             return;
         }
 
-        throw new BadRequestException("You do not have access to this branch");
+        throw new AccessDeniedException("You do not have access to this branch");
     }
 
     /** Store-level equivalent of requireManagerAccessToBranch, for actions not scoped to one branch. */
@@ -161,15 +162,15 @@ public class AccessControlService {
                 return;
             }
 
-            throw new BadRequestException("You do not have management access to this store");
+            throw new AccessDeniedException("You do not have management access to this store");
         }
-        throw new BadRequestException("Only a Store Admin, Store Manager, or Super Admin can manage employees at the store level");
+        throw new AccessDeniedException("Only a Store Admin, Store Manager, or Super Admin can manage employees at the store level");
     }
 
     /** For endpoints that should only ever be reachable by a super admin (system-wide views/actions). */
     public void requireAdmin(User user) {
         if (user.getRole() != UserRole.ROLE_ADMIN) {
-            throw new BadRequestException("Only a Super Admin can perform this action");
+            throw new AccessDeniedException("Only a Super Admin can perform this action");
         }
     }
 
@@ -183,7 +184,7 @@ public class AccessControlService {
         if (user.getId() != null && user.getId().equals(targetUserId)) {
             return;
         }
-        throw new BadRequestException("You do not have access to this resource");
+        throw new AccessDeniedException("You do not have access to this resource");
     }
 
     /** Prevents IDOR when a user id is supplied by a client or service call. */
@@ -207,6 +208,6 @@ public class AccessControlService {
                         currentUser.getRole() == UserRole.ROLE_CASHIER)) {
             return;
         }
-        throw new BadRequestException("You do not have access to this user");
+        throw new AccessDeniedException("You do not have access to this user");
     }
 }

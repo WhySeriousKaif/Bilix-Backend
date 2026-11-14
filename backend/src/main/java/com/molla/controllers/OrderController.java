@@ -6,6 +6,7 @@ import com.molla.payload.dto.OrderDto;
 import com.molla.payload.dto.SystemSalesSummaryDto;
 import com.molla.payload.response.ApiResponse;
 import com.molla.service.OrderService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -21,14 +22,14 @@ public class OrderController {
     private final OrderService orderService;
 
     @PostMapping
-    public ResponseEntity<OrderDto> createOrder(@RequestHeader("idempotency-Key")String idempotencyKey,@RequestBody OrderDto orderDto) throws Exception {
+    public ResponseEntity<OrderDto> createOrder(@RequestHeader("idempotency-Key")String idempotencyKey,@Valid @RequestBody OrderDto orderDto) throws Exception {
         return ResponseEntity.ok(orderService.createOrder(orderDto,idempotencyKey));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<OrderDto> updateOrder(
             @PathVariable("id") Long id,
-            @RequestBody OrderDto orderDto) throws Exception {
+            @Valid @RequestBody OrderDto orderDto) throws Exception {
         return ResponseEntity.ok(orderService.updateOrder(id, orderDto));
     }
 
@@ -88,8 +89,9 @@ public class OrderController {
     }
 
     @GetMapping("/system/summary")
-    public ResponseEntity<SystemSalesSummaryDto> getSystemSalesSummary() {
-        return ResponseEntity.ok(orderService.getSystemSalesSummary());
+    public ResponseEntity<SystemSalesSummaryDto> getSystemSalesSummary(
+            @RequestParam(value = "days", defaultValue = "7") int days) {
+        return ResponseEntity.ok(orderService.getSystemSalesSummary(days));
     }
 
     @GetMapping("/cashier/{cashierId}")

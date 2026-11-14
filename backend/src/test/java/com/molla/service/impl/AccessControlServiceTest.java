@@ -1,7 +1,6 @@
 package com.molla.service.impl;
 
 import com.molla.domain.UserRole;
-import com.molla.exceptions.BadRequestException;
 import com.molla.model.Branch;
 import com.molla.model.Store;
 import com.molla.model.User;
@@ -11,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.Optional;
 
@@ -60,7 +60,7 @@ class AccessControlServiceTest {
     void branchManagerCannotAccessAnotherBranch() {
         User manager = user(100L, UserRole.ROLE_BRANCH_MANAGER, branchA, branchA.getStore());
 
-        assertThrows(BadRequestException.class,
+        assertThrows(AccessDeniedException.class,
                 () -> accessControlService.requireBranchAccess(manager, 2L));
     }
 
@@ -75,7 +75,7 @@ class AccessControlServiceTest {
     void storeManagerCannotAccessAnotherStore() {
         User manager = user(200L, UserRole.ROLE_STORE_MANAGER, null, branchA.getStore());
 
-        assertThrows(BadRequestException.class,
+        assertThrows(AccessDeniedException.class,
                 () -> accessControlService.requireBranchAccess(manager, 2L));
     }
 
@@ -83,7 +83,7 @@ class AccessControlServiceTest {
     void cashierCannotManageEmployees() {
         User cashier = user(300L, UserRole.ROLE_CASHIER, branchA, branchA.getStore());
 
-        assertThrows(BadRequestException.class,
+        assertThrows(AccessDeniedException.class,
                 () -> accessControlService.requireManagerAccessToBranch(cashier, branchA));
     }
 
@@ -99,7 +99,7 @@ class AccessControlServiceTest {
         User current = user(400L, UserRole.ROLE_CASHIER, branchA, branchA.getStore());
         User target = user(401L, UserRole.ROLE_CASHIER, branchB, branchB.getStore());
 
-        assertThrows(BadRequestException.class,
+        assertThrows(AccessDeniedException.class,
                 () -> accessControlService.requireUserAccess(current, target));
     }
 

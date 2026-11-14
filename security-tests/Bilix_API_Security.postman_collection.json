@@ -1,0 +1,116 @@
+{
+  "info": {
+    "name": "Bilix API Security",
+    "description": "Focused authentication, authorization, and privilege-escalation checks for interview demonstration. Run Login first, then the numbered security checks.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" },
+    { "key": "cashierEmail", "value": "cashier@molla.com" },
+    { "key": "cashierPassword", "value": "", "type": "secret" },
+    { "key": "jwt", "value": "", "type": "secret" },
+    { "key": "ownBranchId", "value": "1" },
+    { "key": "otherBranchId", "value": "2" }
+  ],
+  "item": [
+    {
+      "name": "00 - Login as cashier",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Login succeeds', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.jwt).to.be.a('string').and.not.empty;",
+              "pm.collectionVariables.set('jwt', body.jwt);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{cashierEmail}}\",\n  \"password\": \"{{cashierPassword}}\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "01 - Missing JWT is rejected",
+      "event": [{
+        "listen": "test",
+        "script": { "exec": ["pm.test('Missing JWT returns 401', () => pm.response.to.have.status(401));"] }
+      }],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/orders/branch/{{ownBranchId}}"
+      }
+    },
+    {
+      "name": "02 - Malformed JWT is rejected",
+      "event": [{
+        "listen": "test",
+        "script": { "exec": ["pm.test('Malformed JWT returns 401', () => pm.response.to.have.status(401));"] }
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer invalid.jwt.value" }],
+        "url": "{{baseUrl}}/api/orders/branch/{{ownBranchId}}"
+      }
+    },
+    {
+      "name": "03 - Valid JWT reaches assigned branch",
+      "event": [{
+        "listen": "test",
+        "script": { "exec": ["pm.test('Assigned branch returns 200', () => pm.response.to.have.status(200));"] }
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }],
+        "url": "{{baseUrl}}/api/orders/branch/{{ownBranchId}}"
+      }
+    },
+    {
+      "name": "04 - Cross-branch IDOR is rejected",
+      "event": [{
+        "listen": "test",
+        "script": {
+          "exec": [
+            "pm.test('Cross-branch request returns 403', () => pm.response.to.have.status(403));",
+            "pm.test('Response explains access denial', () => pm.expect(pm.response.json().message).to.include('do not have access'));"
+          ]
+        }
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }],
+        "url": "{{baseUrl}}/api/orders/branch/{{otherBranchId}}"
+      }
+    },
+    {
+      "name": "05 - Public signup cannot create Super Admin",
+      "event": [{
+        "listen": "test",
+        "script": {
+          "exec": [
+            "pm.test('Privilege escalation returns 400', () => pm.response.to.have.status(400));",
+            "pm.test('Role restriction is enforced', () => pm.expect(pm.response.json().message).to.include('Cannot self-register'));"
+          ]
+        }
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Security Test\",\n  \"email\": \"postman-admin-attempt@example.com\",\n  \"password\": \"StrongPassword123!\",\n  \"role\": \"ROLE_ADMIN\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/signup"
+      }
+    }
+  ]
+}

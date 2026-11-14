@@ -15,7 +15,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.web.cors.CorsConfiguration;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -64,6 +66,20 @@ public class SecurityConfig {
         };
     }
 
+    @Bean
+    public AuthenticationEntryPoint authenticationEntryPoint() {
+        return (request, response, ex) -> {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            Map<String, Object> body = new HashMap<>();
+            body.put("timestamp", Instant.now().toString());
+            body.put("error", "UNAUTHORIZED");
+            body.put("message", "Authentication is required");
+            body.put("status", 401);
+            new ObjectMapper().writeValue(response.getOutputStream(), body);
+        };
+    }
+
     /**
      * 🔐 Authentication Manager Bean
      * 👉 Purpose: Handles username/password authentication (used in AuthController)
@@ -92,7 +108,10 @@ public class SecurityConfig {
 
         // Disable CSRF (Cross-Site Request Forgery) - not needed for stateless JWT APIs
         http.csrf(cs -> cs.disable())
-                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
+                .headers(headers -> headers
+                        .frameOptions(frame -> frame.sameOrigin())
+                        .addHeaderWriter(new StaticHeadersWriter(
+                                "Cross-Origin-Resource-Policy", "same-origin")))
                 .authorizeHttpRequests(auth -> auth
                         // ⚠️ Public UI, H2 & Swagger paths MUST be first!
                         .requestMatchers("/error", "/health", "/", "/h2-console/**", "/swagger-ui/**", "/swagger-ui.html", "/swagger-ui/index.html").permitAll()
@@ -115,7 +134,9 @@ public class SecurityConfig {
                 // 📌 Stateless sessions - no server-side session storage (JWT handles state)
                 .sessionManagement(sess ->
                         sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(ex -> ex.accessDeniedHandler(accessDeniedHandler()));
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint())
+                        .accessDeniedHandler(accessDeniedHandler()));
 
         // 🔗 Filter Chain Order (CRITICAL for viva):
         // 👉 JwtFilter runs BEFORE UsernamePasswordAuthenticationFilter

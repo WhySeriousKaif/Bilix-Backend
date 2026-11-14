@@ -371,20 +371,29 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public SystemSalesSummaryDto getSystemSalesSummary() {
+        return getSystemSalesSummary(7);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SystemSalesSummaryDto getSystemSalesSummary(int days) {
         accessControlService.requireAdmin(userService.getCurrentUser());
+        if (days != 7 && days != 30) {
+            throw new BadRequestException("Sales period must be 7 or 30 days");
+        }
         LocalDate today = LocalDate.now();
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
-        LocalDateTime sevenDaysStart = today.minusDays(6).atStartOfDay();
+        LocalDateTime periodStart = today.minusDays(days - 1L).atStartOfDay();
 
         double totalSales = orderRepository.sumSystemSales();
         double refundAmount = refundRepository.sumSystemRefundAmount();
 
         Map<LocalDate, Double> dailyTotals = new LinkedHashMap<>();
-        for (int day = 6; day >= 0; day--) {
+        for (int day = days - 1; day >= 0; day--) {
             dailyTotals.put(today.minusDays(day), 0.0);
         }
-        orderRepository.findSalesRowsBetween(sevenDaysStart, tomorrowStart).forEach(row -> {
+        orderRepository.findSalesRowsBetween(periodStart, tomorrowStart).forEach(row -> {
             LocalDate date;
             if (row[0] instanceof LocalDateTime ldt) {
                 date = ldt.toLocalDate();

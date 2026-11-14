@@ -9,6 +9,7 @@ import com.molla.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,6 +23,7 @@ import java.util.List;
  * 🚀 Data Initializer - Automatically seeds default role credentials, demo store, branch, products, customers, and orders on startup
  */
 @Configuration
+@ConditionalOnProperty(name = "app.seed.enabled", havingValue = "true")
 public class DataInitializer {
 
     private static final Logger logger = LoggerFactory.getLogger(DataInitializer.class);

@@ -30,4 +30,5 @@ public interface OrderService {
             String search, OrderStatus status, Long storeId);
 
     SystemSalesSummaryDto getSystemSalesSummary();
+    SystemSalesSummaryDto getSystemSalesSummary(int days);
 }

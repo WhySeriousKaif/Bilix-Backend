@@ -3,6 +3,7 @@ package com.molla.controllers;
 import com.molla.payload.dto.RefundDto;
 import com.molla.payload.response.ApiResponse;
 import com.molla.service.RefundService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +24,7 @@ public class RefundController {
     private final RefundService refundService;
 
     @PostMapping
-    public ResponseEntity<RefundDto> createRefund(@RequestBody RefundDto refundDto) throws Exception {
+    public ResponseEntity<RefundDto> createRefund(@Valid @RequestBody RefundDto refundDto) throws Exception {
         RefundDto refund = refundService.createRefund(refundDto);
         return ResponseEntity.ok(refund);
     }

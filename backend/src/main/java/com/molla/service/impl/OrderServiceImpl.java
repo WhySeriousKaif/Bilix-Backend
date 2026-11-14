@@ -55,7 +55,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = { "productsByStore", "productsAll", "orders", "recentOrdersByBranch" }, allEntries = true)
+    @CacheEvict(cacheNames = {
+            "productsByStore", "productsAll", "orders", "recentOrdersByBranch",
+            "inventory", "inventoriesByBranch"
+    }, allEntries = true)
     public OrderDto createOrder(OrderDto orderDto,String idempotencyKey) throws Exception {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new BadRequestException("Idempotency-Key header is required");

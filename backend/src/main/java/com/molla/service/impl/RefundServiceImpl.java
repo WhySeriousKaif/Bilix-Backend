@@ -52,7 +52,10 @@ public class RefundServiceImpl implements RefundService {
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = { "productsByStore", "productsAll", "orders", "recentOrdersByBranch" }, allEntries = true)
+    @CacheEvict(cacheNames = {
+            "productsByStore", "productsAll", "orders", "recentOrdersByBranch",
+            "inventory", "inventoriesByBranch"
+    }, allEntries = true)
     public RefundDto createRefund(RefundDto refundDto) throws Exception {
         // The refund is always attributed to whoever is actually authenticated —
         // never trust a cashier/branch id supplied by the client for this.
